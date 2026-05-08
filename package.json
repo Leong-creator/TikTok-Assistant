@@ -1,0 +1,13 @@
+{
+  "name": "tiktok-content-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "generate:test": "node src/cli.mjs --script fixtures/sample-script.txt --slug demo --mode test --provider mock"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
