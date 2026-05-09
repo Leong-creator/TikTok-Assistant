@@ -18,6 +18,26 @@ Generate a test package with mock assets:
 npm run generate:test
 ```
 
+Generate the selected `top01_164k` reference sample with mock image-only assets:
+
+```bash
+npm run generate:top01:mock
+```
+
+Generate the same sample with Dreamina CLI images only:
+
+```bash
+npm run generate:top01:dreamina
+```
+
+Run the formal image MVP route:
+
+```bash
+npm run generate:top01:image-mvp
+```
+
+`generate:top01:image-mvp` routes the first three key images to ChatGPT web `image-2` and the remaining stills to Dreamina. It requires a Codex browser adapter for ChatGPT web image generation; it must not fall back to OpenAI API or another ChatGPT image model. Dreamina prompts are Chinese-only and use `model_version=4.0` by default for free image tests.
+
 The package is written to:
 
 ```text
@@ -35,10 +55,12 @@ Each package contains:
 - `04_bulk_images_dreamina/`: bulk image provider output or mock placeholders.
 - `05_video_clips_dreamina/`: image-to-video output or mock descriptors.
 - `06_editing_package/`: CapCut import manifest and manual import guide.
-- `07_review_log/`: prompt iteration log and manual review list.
+- `07_review_log/`: prompt iteration log, contact sheet, visual review log, and manual review list.
 
 ## Real Provider Status
 
-- Chrome extension backend is available and can see existing Chrome tabs.
-- Dreamina CLI is installed, but real generation must wait until `dreamina login` succeeds.
-- Paid Dreamina generation is not run by default.
+- Dreamina image generation uses the official `dreamina` CLI only.
+- Dreamina image generation defaults to `model_version=4.0` for image MVP tests.
+- Provider failures are logged per shot and do not stop the full package.
+- ChatGPT key-image generation uses ChatGPT web `image-2` because ChatGPT Pro does not include API usage.
+- Video generation is not part of this MVP test; video candidate shots are generated as first-frame images.

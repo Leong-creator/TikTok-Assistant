@@ -24,6 +24,18 @@ Transform a TikTok Shop script into a local CapCut-ready asset folder. The MVP p
 | `standard` | 12 | 28 | Normal short production package |
 | `full` | 24 | 56 | Future 3-6 minute package |
 
+## Formal Image-Only Test
+
+The first real-provider MVP run uses `fixtures/top01-reference-script.txt`, derived from the `top01_164k` reference video frames and visible subtitles.
+
+- Provider: `image-mvp`.
+- Key images: first 3 shots through ChatGPT web `image-2`.
+- Bulk images: remaining shots through `dreamina text2image` with Chinese-only Dreamina prompts.
+- Video candidates: keep `storyboardAssetType=video`, but generate image first frames only.
+- No fallback is allowed for ChatGPT `image-2`.
+- Provider failures are retried per shot, logged, and do not stop the rest of the package.
+- After generation, create a contact sheet and write visual issues into `07_review_log/needs_manual_review.json`.
+
 ## Manual Work Left For MVP
 
 - Voiceover/audio.

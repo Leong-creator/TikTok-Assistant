@@ -94,3 +94,24 @@ test("generateAssetPackage records manual review when mock provider rejects a sh
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("generateAssetPackage keeps U.S. dollars together when splitting storyboard lines", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-pipeline-"));
+  try {
+    const result = await generateAssetPackage({
+      script: "She paid in U.S. dollars, smiled at everyone, and looked calm. Then she made a boundary mistake.",
+      outputRoot: root,
+      slug: "abbreviation-split",
+      mode: "test",
+      provider: "mock",
+      now: new Date("2026-05-09T00:00:00+08:00")
+    });
+
+    const storyboard = JSON.parse(
+      await readFile(path.join(result.packageDir, "01_storyboard/storyboard.json"), "utf8")
+    );
+    assert.equal(storyboard[0].line, "She paid in U.S. dollars, smiled at everyone, and looked calm.");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -7,7 +7,9 @@ import { generateAssetPackage } from "./pipeline.mjs";
 const args = parseArgs(process.argv.slice(2));
 
 if (!args.script) {
-  console.error("Usage: node src/cli.mjs --script <file> [--slug name] [--mode test|standard|full] [--provider mock]");
+  console.error(
+    "Usage: node src/cli.mjs --script <file> [--slug name] [--mode test|standard|full] [--provider mock|dreamina-image|chatgpt-web-image2|image-mvp] [--image-only]"
+  );
   process.exit(2);
 }
 
@@ -18,6 +20,13 @@ const result = await generateAssetPackage({
   slug: args.slug ?? path.basename(args.script, path.extname(args.script)),
   mode: args.mode ?? "test",
   provider: args.provider ?? "mock",
+  imageOnly: Boolean(args["image-only"]),
+  keyImageCount: args["key-image-count"] ? Number(args["key-image-count"]) : undefined,
+  dreamina: {
+    modelVersion: args["dreamina-model-version"],
+    resolutionType: args["dreamina-resolution-type"],
+    pollSeconds: args["dreamina-poll-seconds"] ? Number(args["dreamina-poll-seconds"]) : undefined
+  },
   language: args.language ?? "en-US",
   region: args.region ?? "United States"
 });

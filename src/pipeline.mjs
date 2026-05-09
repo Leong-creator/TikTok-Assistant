@@ -1,5 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const MODES = {
   test: { totalShots: 20, videoShots: 5 },
@@ -23,8 +27,8 @@ const PRESETS = {
   "parenting-book": {
     label: "Parenting book",
     style:
-      "American family education illustration, school and home scenes, parent-child interaction, warm daylight, clean educational book-commercial framing, wholesome emotional expressions",
-    usage: "children and parenting book scripts"
+      "American street-smart parenting book commercial illustration, dramatic adult family conflict at home, mentor teaching boundaries, later transition to children learning real-world problem solving, polished TikTok story-ad style, expressive faces, warm interior light with slight noir contrast",
+    usage: "children, parenting books, family boundaries and street-smart education scripts"
   },
   "people-skill-drama": {
     label: "People skill drama",
@@ -77,7 +81,7 @@ export async function generateAssetPackage(options) {
   const generation = await generateAndReviewAssets({
     packageDir,
     prompts,
-    provider: config.provider,
+    config,
     forceRejectShotIds: config.forceRejectShotIds
   });
 
@@ -122,6 +126,15 @@ function normalizeOptions(options) {
     slug: slugify(options.slug ?? "tiktok-content"),
     mode,
     provider: options.provider ?? "mock",
+    providerAdapters: options.providerAdapters ?? {},
+    imageOnly: Boolean(options.imageOnly),
+    keyImageCount: Number(options.keyImageCount ?? 3),
+    dreamina: {
+      modelVersion: options.dreamina?.modelVersion ?? "4.0",
+      resolutionType: options.dreamina?.resolutionType ?? "2k",
+      ratio: options.dreamina?.ratio ?? "9:16",
+      pollSeconds: Number(options.dreamina?.pollSeconds ?? 90)
+    },
     now: options.now ?? new Date(),
     language: options.language ?? "en-US",
     region: options.region ?? "United States",
@@ -162,11 +175,29 @@ function localizeScript(script, language, region) {
 }
 
 function splitSentences(script) {
-  return script
+  const placeholders = new Map([
+    ["U.S.", "U__S__"],
+    ["U.K.", "U__K__"],
+    ["U.N.", "U__N__"]
+  ]);
+  let protectedScript = script;
+  for (const [source, placeholder] of placeholders.entries()) {
+    protectedScript = protectedScript.replaceAll(source, placeholder);
+  }
+  return protectedScript
     .replace(/\r/g, "")
     .split(/\n|(?<=[.!?。！？])\s+/u)
     .map((line) => line.trim())
+    .map((line) => restoreSentencePlaceholders(line, placeholders))
     .filter(Boolean);
+}
+
+function restoreSentencePlaceholders(line, placeholders) {
+  let restored = line;
+  for (const [source, placeholder] of placeholders.entries()) {
+    restored = restored.replaceAll(placeholder, source);
+  }
+  return restored;
 }
 
 function buildStoryboard(script, totalShots, videoShots, category) {
@@ -235,6 +266,16 @@ function buildPromptForShot(shot, category) {
     `Camera: ${camera}.`,
     "Include clear adult character actions, expressive micro-emotions, US-local environment details, warm cinematic light, and clean center space for captions."
   ].join(" ");
+  const generationPrompt = [
+    "竖版单张电影插画剧照，现代美式插画质感，暖色室内光线，真实人体比例，人物表情清楚，画面有现实家庭故事的戏剧张力。",
+    "成人家庭边界冲突主题，普通美国家庭住宅场景，人物克制但情绪紧张，主体占据画面大部分，底部只保留少量干净负空间。",
+    "竖版构图，单幅完整画面，不要多格画面，不要拼贴，不要左右分屏，不要界面叠层。",
+    "无字版画面，只呈现人物、环境和物件，不要出现任何文字，不要标题，不要气泡对白，不要水印，不要商标，不要数字，不要界面元素，不要把提示词里的任何字符画进画面。",
+    `画面内容：${translateVisualBeatForDreamina(shot)}。`,
+    `主体重点：${translateSubjectTag(shot.subjectTag)}。`,
+    `镜头感觉：${translateCameraForDreamina(camera)}。`,
+    "人物动作要清楚，情绪要一眼可读，环境要像美国普通家庭住宅，主体位于画面上中部和中部，底部只保留少量干净负空间，不要大面积空白。"
+  ].join(" ");
   const videoPrompt = [
     "Animate this image as a short TikTok story beat.",
     "Use smooth camera movement, subtle character motion, natural lighting change, and no added text.",
@@ -249,11 +290,71 @@ function buildPromptForShot(shot, category) {
     assetType: shot.assetType,
     line: shot.line,
     imagePrompt,
+    generationPrompt,
     videoPrompt
   };
 }
 
-async function generateAndReviewAssets({ packageDir, prompts, provider, forceRejectShotIds }) {
+function translateVisualBeatForDreamina(shot) {
+  if (shot.section === "hook_video") {
+    return `用明显的家庭冲突开场，成年人围绕家庭边界、亲戚照顾和家中压力发生克制但紧张的对峙，画面只表现情境，不写任何台词`;
+  }
+  if (shot.section === "conversion") {
+    return `把故事教训自然连接到成年人阅读思考的场景，保留前面的家庭边界故事语境，纸质读物只露出翻开的空白页面`;
+  }
+  if (shot.category === "raise_children") {
+    return describeParentingLineForDreamina(shot.line);
+  }
+  if (shot.category === "people_skill") {
+    return "展示成年人社交压力、办公室肢体语言或公共互动冲突，让观众不听声音也能理解人物关系的紧张感";
+  }
+  return "展示金钱、商业、酒店、汽车或办公室相关的具体场景，让观众不听声音也能理解利益和压力关系";
+}
+
+function describeParentingLineForDreamina(line) {
+  const normalized = line.toLowerCase();
+  if (normalized.includes("paid in u.s. dollars")) {
+    return "年轻女性在城市生活场景中显得体面礼貌，手里拿着钱包或付款动作，周围环境暗示她懂规则但内心有压力";
+  }
+  if (normalized.includes("same mistake")) {
+    return "女性站在家门口，外人的行李和问题正要进入她的家，她表情犹豫，室内家人露出担忧神情";
+  }
+  if (normalized.includes("older mentor")) {
+    return "年长导师在客厅里平静地提醒年轻成年人设立边界，年轻人认真倾听，气氛严肃但不是争吵";
+  }
+  if (normalized.includes("most powerful")) {
+    return "一个成年人面对多人请求时保持冷静和坚定，用手势表达拒绝，周围人有压力感但场面克制";
+  }
+  if (normalized.includes("handle pressure")) {
+    return "成年人站在家门口守住边界，身后是家人和温暖室内，门外有人带着行李和请求，形成内外压力对比";
+  }
+  if (normalized.includes("children to survive")) {
+    return "父母在客厅或餐桌旁教育孩子现实判断，孩子认真听，桌上有生活物件和书本，氛围像实用人生课";
+  }
+  if (normalized.includes("solve problems")) {
+    return "孩子在父母引导下自己处理一个小问题，父母没有代替他完成，画面表现独立解决问题";
+  }
+  if (normalized.includes("hard way")) {
+    return "孩子在家庭或街区环境中经历一次现实挑战，表情从困惑转为明白，画面有成长感";
+  }
+  if (normalized.includes("parents should read")) {
+    return "父母在温暖室内看着翻开的空白纸页，旁边孩子在做现实问题练习";
+  }
+  return "展示父母、孩子、家庭客厅或学习场景，让观众不听声音也能理解家庭教育和边界压力";
+}
+
+function translateSubjectTag(subjectTag) {
+  if (subjectTag === "person_and_object") return "人物和关键物件同时清楚可见";
+  if (subjectTag === "object_or_symbol") return "关键物件或象征物清楚可见";
+  return "人物表情和动作清楚可见";
+}
+
+function translateCameraForDreamina(camera) {
+  if (/slow push-in/i.test(camera)) return "像短视频开头首帧，轻微推进感，画面有电影紧张感";
+  return "稳定画面，适合后期在剪映里做缓慢放大或平移";
+}
+
+async function generateAndReviewAssets({ packageDir, prompts, config, forceRejectShotIds }) {
   const acceptedAssets = [];
   const reviewLines = [];
   const needsManualReview = [];
@@ -262,13 +363,38 @@ async function generateAndReviewAssets({ packageDir, prompts, provider, forceRej
     let accepted = false;
     let lastReason = "";
     for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const asset = await generateMockAsset(packageDir, prompt, provider, attempt);
+      const route = selectProviderRoute(prompt, config);
+      let asset;
+      try {
+        asset = await generateAssetWithProvider({ packageDir, prompt, attempt, route, config });
+      } catch (error) {
+        const issue = `provider_error: ${formatProviderError(error)}`;
+        reviewLines.push(JSON.stringify({
+          shotId: prompt.shotId,
+          attempt,
+          provider: route.providerName,
+          storyboardAssetType: prompt.assetType,
+          generatedAssetType: route.assetType,
+          originalPrompt: prompt.imagePrompt,
+          generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
+          videoPrompt: prompt.videoPrompt,
+          issue,
+          promptChange: "retry the same prompt once; if the provider keeps failing, inspect provider logs or simplify the provider prompt",
+          status: "rejected",
+          assetPath: ""
+        }));
+        lastReason = issue;
+        continue;
+      }
       const review = reviewAsset(prompt, asset, forceRejectShotIds.has(prompt.shotId));
       reviewLines.push(JSON.stringify({
         shotId: prompt.shotId,
         attempt,
-        provider,
+        provider: asset.provider,
+        storyboardAssetType: prompt.assetType,
+        generatedAssetType: asset.assetType,
         originalPrompt: prompt.imagePrompt,
+        generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
         videoPrompt: prompt.videoPrompt,
         issue: review.issue,
         promptChange: review.promptChange,
@@ -276,7 +402,7 @@ async function generateAndReviewAssets({ packageDir, prompts, provider, forceRej
         assetPath: asset.relativePath
       }));
       if (review.status === "accepted") {
-        acceptedAssets.push({ ...asset, prompt, attempts: attempt });
+        acceptedAssets.push({ ...asset, prompt, attempts: attempt, storyboardAssetType: prompt.assetType });
         accepted = true;
         break;
       }
@@ -287,7 +413,8 @@ async function generateAndReviewAssets({ packageDir, prompts, provider, forceRej
         shotId: prompt.shotId,
         attempts: 3,
         reason: `${lastReason}; manual review required after max retries`,
-        prompt: prompt.imagePrompt
+        prompt: prompt.imagePrompt,
+        generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
       });
     }
   }
@@ -295,9 +422,69 @@ async function generateAndReviewAssets({ packageDir, prompts, provider, forceRej
   return { acceptedAssets, reviewLines, needsManualReview };
 }
 
-async function generateMockAsset(packageDir, prompt, provider, attempt) {
-  const isVideo = prompt.assetType === "video";
-  const folder = isVideo ? "05_video_clips_dreamina" : prompt.order <= 3 ? "03_key_images_chatgpt" : "04_bulk_images_dreamina";
+function formatProviderError(error) {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw.replace(/\s+/g, " ").slice(0, 1000);
+}
+
+function selectProviderRoute(prompt, config) {
+  if (config.provider === "image-mvp") {
+    const providerName = prompt.order <= config.keyImageCount ? "chatgpt-web-image2" : "dreamina-image";
+    return {
+      providerName,
+      assetType: "image",
+      folder: providerName === "chatgpt-web-image2" ? "03_key_images_chatgpt" : "04_bulk_images_dreamina"
+    };
+  }
+  if (config.provider === "dreamina-image") {
+    return {
+      providerName: "dreamina-image",
+      assetType: "image",
+      folder: "04_bulk_images_dreamina"
+    };
+  }
+  if (config.provider === "chatgpt-web-image2") {
+    return {
+      providerName: "chatgpt-web-image2",
+      assetType: "image",
+      folder: "03_key_images_chatgpt"
+    };
+  }
+  const isVideo = prompt.assetType === "video" && !config.imageOnly;
+  return {
+    providerName: "mock",
+    assetType: isVideo ? "video" : "image",
+    folder: isVideo ? "05_video_clips_dreamina" : prompt.order <= config.keyImageCount ? "03_key_images_chatgpt" : "04_bulk_images_dreamina"
+  };
+}
+
+async function generateAssetWithProvider({ packageDir, prompt, attempt, route, config }) {
+  const adapter = resolveProviderAdapter(route.providerName, config);
+  if (adapter) {
+    return adapter.generate({ packageDir, prompt, attempt, folder: route.folder, assetType: route.assetType, provider: route.providerName, config });
+  }
+  if (route.providerName === "mock") {
+    return generateMockAsset(packageDir, prompt, route.providerName, attempt, route);
+  }
+  if (route.providerName === "dreamina-image") {
+    return generateDreaminaImageAsset({ packageDir, prompt, attempt, folder: route.folder, config });
+  }
+  if (route.providerName === "chatgpt-web-image2") {
+    return generateChatGptWebImage2Asset({ packageDir, prompt, attempt, folder: route.folder });
+  }
+  throw new Error(`unsupported provider route: ${route.providerName}`);
+}
+
+function resolveProviderAdapter(providerName, config) {
+  if (providerName === "chatgpt-web-image2") return config.providerAdapters.chatgptWebImage2;
+  if (providerName === "dreamina-image") return config.providerAdapters.dreaminaImage;
+  if (providerName === "mock") return config.providerAdapters.mock;
+  return undefined;
+}
+
+async function generateMockAsset(packageDir, prompt, provider, attempt, route = selectProviderRoute(prompt, { provider: "mock", imageOnly: false, keyImageCount: 3 })) {
+  const isVideo = route.assetType === "video";
+  const folder = route.folder;
   const extension = isVideo ? "mock-video.txt" : "svg";
   const filename = `${prompt.shotId}_${slugify(prompt.presetId)}_a${attempt}.${extension}`;
   const relativePath = path.join(folder, filename).replaceAll("\\", "/");
@@ -306,11 +493,79 @@ async function generateMockAsset(packageDir, prompt, provider, attempt) {
   await writeText(absolutePath, contents);
   return {
     shotId: prompt.shotId,
-    assetType: prompt.assetType,
+    assetType: route.assetType,
     provider,
     relativePath,
     absolutePath
   };
+}
+
+async function generateDreaminaImageAsset({ packageDir, prompt, attempt, folder, config }) {
+  const downloadDir = path.join(packageDir, folder, `${prompt.shotId}_dreamina_a${attempt}_download`);
+  await mkdir(downloadDir, { recursive: true });
+  const args = [
+    "text2image",
+    `--prompt=${prompt.generationPrompt ?? prompt.imagePrompt}`,
+    `--ratio=${config.dreamina.ratio}`,
+    `--resolution_type=${config.dreamina.resolutionType}`,
+    `--poll=${config.dreamina.pollSeconds}`
+  ];
+  if (config.dreamina.modelVersion) {
+    args.push(`--model_version=${config.dreamina.modelVersion}`);
+  }
+  const submitted = await runProviderCommand("dreamina", args);
+  const submitId = extractSubmitId(submitted.stdout);
+  if (!submitId) {
+    throw new Error(`Dreamina did not return a submit_id for ${prompt.shotId}: ${submitted.stdout || submitted.stderr}`);
+  }
+  const queried = await runProviderCommand("dreamina", [
+    "query_result",
+    `--submit_id=${submitId}`,
+    `--download_dir=${downloadDir}`
+  ]);
+  const downloaded = await findDownloadedImage(downloadDir);
+  if (!downloaded) {
+    throw new Error(`Dreamina did not download an image for ${prompt.shotId}: ${queried.stdout || queried.stderr}`);
+  }
+  const extension = path.extname(downloaded) || ".png";
+  const filename = `${prompt.shotId}_dreamina-image_a${attempt}${extension}`;
+  const absolutePath = path.join(packageDir, folder, filename);
+  await rename(downloaded, absolutePath);
+  const metadataPath = absolutePath.replace(extension, ".json");
+  await writeJson(metadataPath, {
+    provider: "dreamina-image",
+    shotId: prompt.shotId,
+    attempt,
+    submitId,
+    prompt: prompt.imagePrompt,
+    generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
+    stdout: [submitted.stdout, queried.stdout].filter(Boolean).join("\n")
+  });
+  return {
+    shotId: prompt.shotId,
+    assetType: "image",
+    provider: "dreamina-image",
+    relativePath: path.relative(packageDir, absolutePath).replaceAll("\\", "/"),
+    absolutePath,
+    metadata: { submitId, metadataPath }
+  };
+}
+
+async function generateChatGptWebImage2Asset({ packageDir, prompt, attempt, folder }) {
+  const taskDir = path.join(packageDir, "07_review_log", "chatgpt_web_tasks");
+  await mkdir(taskDir, { recursive: true });
+  await writeJson(path.join(taskDir, `${prompt.shotId}_a${attempt}.json`), {
+    provider: "chatgpt-web-image2",
+    model: "image-2",
+    shotId: prompt.shotId,
+    attempt,
+    outputFolder: folder,
+    prompt: prompt.imagePrompt,
+    generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
+  });
+  throw new Error(
+    `chatgpt-web-image2 requires the Codex Chrome browser adapter to generate ${prompt.shotId}; task JSON was written for browser execution`
+  );
 }
 
 function reviewAsset(prompt, asset, forcedReject) {
@@ -340,10 +595,12 @@ function buildEditingManifest(acceptedAssets, config, category) {
     order: asset.prompt.order,
     category,
     assetType: asset.assetType,
+    storyboardAssetType: asset.storyboardAssetType,
+    provider: asset.provider,
     assetPath: asset.relativePath,
-    durationSeconds: asset.assetType === "video" ? 5 : 3,
+    durationSeconds: asset.storyboardAssetType === "video" ? 5 : 3,
     captionText: asset.prompt.line,
-    suggestedEdit: asset.assetType === "video" ? "place as generated hook/story video" : "apply slow zoom or slight horizontal pan in CapCut",
+    suggestedEdit: buildSuggestedEdit(asset),
     promptPreset: asset.prompt.presetId,
     attempts: asset.attempts
   }));
@@ -360,6 +617,14 @@ function buildEditingManifest(acceptedAssets, config, category) {
     ],
     shots
   };
+}
+
+function buildSuggestedEdit(asset) {
+  if (asset.assetType === "video") return "place as generated hook/story video";
+  if (asset.storyboardAssetType === "video") {
+    return "use as first frame for future image-to-video; for this image-only test, apply slow push-in in CapCut";
+  }
+  return "apply slow zoom or slight horizontal pan in CapCut";
 }
 
 function buildManualCapCutGuide(manifest) {
@@ -437,6 +702,8 @@ function toCsv(rows) {
     "order",
     "category",
     "assetType",
+    "storyboardAssetType",
+    "provider",
     "assetPath",
     "durationSeconds",
     "captionText",
@@ -448,6 +715,46 @@ function toCsv(rows) {
     headers.join(","),
     ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(","))
   ].join("\n") + "\n";
+}
+
+async function runProviderCommand(command, args) {
+  try {
+    return await execFileAsync(command, args, {
+      encoding: "utf8",
+      maxBuffer: 20 * 1024 * 1024,
+      windowsHide: true
+    });
+  } catch (error) {
+    const stdout = error.stdout ? `\nstdout:\n${error.stdout}` : "";
+    const stderr = error.stderr ? `\nstderr:\n${error.stderr}` : "";
+    throw new Error(`${command} ${args.join(" ")} failed with exit code ${error.code ?? "unknown"}${stdout}${stderr}`);
+  }
+}
+
+function extractSubmitId(output) {
+  const text = String(output ?? "");
+  const jsonMatch = text.match(/"submit_id"\s*:\s*"([^"]+)"/i);
+  if (jsonMatch) return jsonMatch[1];
+  const labeledMatch = text.match(/submit[_\s-]*id["'\s:=]+([a-zA-Z0-9_-]{8,})/i);
+  if (labeledMatch) return labeledMatch[1];
+  const uuidMatch = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (uuidMatch) return uuidMatch[0];
+  return "";
+}
+
+async function findDownloadedImage(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const nested = await findDownloadedImage(fullPath);
+      if (nested) files.push(nested);
+    } else if (/\.(png|jpe?g|webp)$/i.test(entry.name)) {
+      files.push(fullPath);
+    }
+  }
+  return files[0] ?? "";
 }
 
 function csvCell(value) {
