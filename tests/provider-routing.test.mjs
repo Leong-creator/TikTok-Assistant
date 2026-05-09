@@ -95,7 +95,10 @@ test("provider generation prompts omit shot labels and forbid panels or text", a
     assert.ok(generatedPrompts.every((prompt) => /不要多格画面/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/漫画/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/字幕/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => !/气泡/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => !/对白/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/封面/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => !/海报/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/[A-Za-z0-9]/.test(prompt)));
   } finally {
     await rm(root, { recursive: true, force: true });

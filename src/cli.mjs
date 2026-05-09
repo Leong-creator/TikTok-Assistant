@@ -2,13 +2,32 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { generateAssetPackage } from "./pipeline.mjs";
+import { generateAssetPackage, retryPackageShots } from "./pipeline.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 
+if (args["retry-package"]) {
+  const result = await retryPackageShots({
+    packageDir: path.resolve(args["retry-package"]),
+    shots: parseShotList(args.shots),
+    provider: args.provider ?? "dreamina-image",
+    dreamina: {
+      modelVersion: args["dreamina-model-version"],
+      resolutionType: args["dreamina-resolution-type"],
+      pollSeconds: args["dreamina-poll-seconds"] ? Number(args["dreamina-poll-seconds"]) : undefined,
+      sessionId: args["dreamina-session-id"],
+      sessionName: args["dreamina-session"],
+      concurrency: args["dreamina-concurrency"] ? Number(args["dreamina-concurrency"]) : undefined
+    }
+  });
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(0);
+}
+
 if (!args.script) {
   console.error(
-    "Usage: node src/cli.mjs --script <file> [--slug name] [--mode test|standard|full] [--provider mock|dreamina-image|chatgpt-web-image2|image-mvp] [--image-only]"
+    "Usage: node src/cli.mjs --script <file> [--slug name] [--mode test|standard|full] [--provider mock|dreamina-image|chatgpt-web-image2|image-mvp] [--image-only]\n" +
+      "Retry: node src/cli.mjs --retry-package <folder> --shots S015,S016 [--provider dreamina-image]"
   );
   process.exit(2);
 }
@@ -25,8 +44,12 @@ const result = await generateAssetPackage({
   dreamina: {
     modelVersion: args["dreamina-model-version"],
     resolutionType: args["dreamina-resolution-type"],
-    pollSeconds: args["dreamina-poll-seconds"] ? Number(args["dreamina-poll-seconds"]) : undefined
+    pollSeconds: args["dreamina-poll-seconds"] ? Number(args["dreamina-poll-seconds"]) : undefined,
+    sessionId: args["dreamina-session-id"],
+    sessionName: args["dreamina-session"],
+    concurrency: args["dreamina-concurrency"] ? Number(args["dreamina-concurrency"]) : undefined
   },
+  resumeFrom: args["resume-from"],
   language: args.language ?? "en-US",
   region: args.region ?? "United States"
 });
@@ -48,4 +71,12 @@ function parseArgs(argv) {
     }
   }
   return parsed;
+}
+
+function parseShotList(value) {
+  if (!value || value === true) return [];
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

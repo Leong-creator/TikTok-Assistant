@@ -1,9 +1,26 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import {
+  buildDreaminaText2ImageArgs,
+  extractDreaminaSessionId,
+  nextDreaminaConcurrency,
+  runDreaminaQueue
+} from "./dreamina-provider.mjs";
+import { upsertPackageIndex } from "./package-index.mjs";
+
 const execFileAsync = promisify(execFile);
+
+export const PIPELINE_PHASES = [
+  "preparePackage",
+  "buildStoryboard",
+  "planPrompts",
+  "generateAssets",
+  "reviewAssets",
+  "finalizePackage"
+];
 
 const MODES = {
   test: { totalShots: 20, videoShots: 5 },
@@ -66,23 +83,52 @@ export async function generateAssetPackage(options) {
   const modeConfig = MODES[config.mode];
   const packageDir = path.join(config.outputRoot, `${formatLocalDate(config.now)}-${config.slug}`);
   await createPackageDirectories(packageDir);
+  await resetPipelineCheckpoints(packageDir);
+  await recordPipelineCheckpoint(packageDir, config, "preparePackage", {
+    status: "completed",
+    resumeFrom: config.resumeFrom,
+    packageDir
+  });
 
   const originalScript = config.script.trim();
   const category = config.category ?? inferCategory(originalScript);
   const localizedScript = localizeScript(originalScript, config.language, config.region);
-  const shots = buildStoryboard(localizedScript, modeConfig.totalShots, modeConfig.videoShots, category);
-  const prompts = shots.map((shot) => buildPromptForShot(shot, category));
+  const storyboardPath = path.join(packageDir, "01_storyboard/storyboard.json");
+  const promptsPath = path.join(packageDir, "02_prompts/prompts.json");
+  const reusedStoryboard = await maybeReadJson(storyboardPath, shouldReusePhaseOutput(config, "buildStoryboard"));
+  const shots = reusedStoryboard ?? buildStoryboard(localizedScript, modeConfig.totalShots, modeConfig.videoShots, category);
+  await recordPipelineCheckpoint(packageDir, config, "buildStoryboard", {
+    status: "completed",
+    loadedFromExisting: Boolean(reusedStoryboard),
+    shotCount: shots.length,
+    videoShots: shots.filter((shot) => shot.assetType === "video").length
+  });
+
+  const reusedPrompts = await maybeReadJson(promptsPath, shouldReusePhaseOutput(config, "planPrompts"));
+  const prompts = reusedPrompts ?? shots.map((shot) => buildPromptForShot(shot, category));
+  await recordPipelineCheckpoint(packageDir, config, "planPrompts", {
+    status: "completed",
+    loadedFromExisting: Boolean(reusedPrompts),
+    promptCount: prompts.length
+  });
 
   await writeText(path.join(packageDir, "00_script/original.txt"), originalScript + "\n");
   await writeText(path.join(packageDir, "00_script/localized.txt"), localizedScript + "\n");
-  await writeJson(path.join(packageDir, "01_storyboard/storyboard.json"), shots);
-  await writeJson(path.join(packageDir, "02_prompts/prompts.json"), prompts);
+  await writeJson(storyboardPath, shots);
+  await writeJson(promptsPath, prompts);
+
+  await resolveDreaminaSessionIfNeeded(config);
 
   const generation = await generateAndReviewAssets({
     packageDir,
     prompts,
     config,
     forceRejectShotIds: config.forceRejectShotIds
+  });
+  await recordPipelineCheckpoint(packageDir, config, "generateAssets", {
+    status: "completed",
+    accepted: generation.acceptedAssets.length,
+    manualReview: generation.needsManualReview.length
   });
 
   const manifest = buildEditingManifest(generation.acceptedAssets, config, category);
@@ -91,7 +137,35 @@ export async function generateAssetPackage(options) {
   await writeText(path.join(packageDir, "06_editing_package/manual_capcut_steps.md"), buildManualCapCutGuide(manifest));
   await writeText(path.join(packageDir, "07_review_log/prompt_iterations.jsonl"), generation.reviewLines.join("\n") + "\n");
   await writeJson(path.join(packageDir, "07_review_log/needs_manual_review.json"), generation.needsManualReview);
+  await recordPipelineCheckpoint(packageDir, config, "reviewAssets", {
+    status: "completed",
+    reviewLines: generation.reviewLines.length,
+    manualReview: generation.needsManualReview.length
+  });
   await writeText(path.join(packageDir, "07_review_log/checkpoint_log.md"), buildCheckpointLog(config, category, manifest, generation));
+  await upsertPackageIndex({
+    outputRoot: config.outputRoot,
+    entry: {
+      slug: config.slug,
+      packageName: path.basename(packageDir),
+      scriptTitle: firstScriptTitle(originalScript),
+      provider: config.provider,
+      mode: config.mode,
+      status: "completed",
+      path: packageDir,
+      generated: {
+        total: shots.length,
+        accepted: generation.acceptedAssets.length,
+        failed: generation.needsManualReview.length
+      },
+      manualReview: generation.needsManualReview.length
+    }
+  });
+  await recordPipelineCheckpoint(packageDir, config, "finalizePackage", {
+    status: "completed",
+    manifestShots: manifest.shots.length,
+    indexed: true
+  });
 
   return {
     packageDir,
@@ -110,6 +184,166 @@ export async function generateAssetPackage(options) {
 export async function generateAssetPackageFromFile(options) {
   const script = await readFile(options.scriptPath, "utf8");
   return generateAssetPackage({ ...options, script });
+}
+
+export async function retryPackageShots(options) {
+  const packageDir = path.resolve(options.packageDir);
+  const requestedShotIds = [...new Set(options.shots ?? [])];
+  if (!requestedShotIds.length) {
+    throw new Error("at least one shot id is required for retry");
+  }
+
+  const promptsPath = path.join(packageDir, "02_prompts/prompts.json");
+  const manifestPath = path.join(packageDir, "06_editing_package/editing_manifest.json");
+  const needsManualPath = path.join(packageDir, "07_review_log/needs_manual_review.json");
+  const prompts = JSON.parse(await readFile(promptsPath, "utf8"));
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const needsManualReview = await readJsonOrDefault(needsManualPath, []);
+  const provider = options.provider ?? "dreamina-image";
+  const config = {
+    provider,
+    providerAdapters: options.providerAdapters ?? {},
+    imageOnly: true,
+    keyImageCount: 0,
+    mode: manifest.mode ?? "test",
+    language: manifest.language ?? "en-US",
+    region: manifest.region ?? "United States",
+    slug: path.basename(packageDir),
+    now: options.now ?? new Date(),
+    dreamina: {
+      modelVersion: options.dreamina?.modelVersion ?? "4.0",
+      resolutionType: options.dreamina?.resolutionType ?? "2k",
+      ratio: options.dreamina?.ratio ?? "9:16",
+      pollSeconds: Number(options.dreamina?.pollSeconds ?? 90),
+      sessionId: options.dreamina?.sessionId,
+      sessionName: normalizeDreaminaSessionName(options.dreamina?.sessionName ?? `retry-${path.basename(packageDir)}`),
+      concurrency: Number(options.dreamina?.concurrency ?? 1)
+    },
+    forceRejectShotIds: new Set()
+  };
+
+  await resolveDreaminaSessionIfNeeded(config);
+
+  const promptById = new Map(prompts.map((prompt) => [prompt.shotId, prompt]));
+  const retriedShotIds = [];
+  const retryReviewLines = [];
+  const visualReviewLines = [];
+  const acceptedShotIds = new Set();
+
+  for (const shotId of requestedShotIds) {
+    const prompt = promptById.get(shotId);
+    if (!prompt) {
+      throw new Error(`shot ${shotId} not found in ${promptsPath}`);
+    }
+    const fixedPrompt = applyRetryPromptFixes(prompt);
+    Object.assign(prompt, fixedPrompt);
+    const existingManifestShot = manifest.shots.find((shot) => shot.shotId === shotId);
+    const attempt = Number(existingManifestShot?.attempts ?? 1) + 1;
+    const route = selectProviderRoute(prompt, config);
+    const asset = await generateAssetWithProvider({ packageDir, prompt, attempt, route, config });
+    const review = reviewAsset(prompt, asset, false);
+    const reviewEntry = {
+      timestamp: new Date().toISOString(),
+      retry: true,
+      shotId,
+      attempt,
+      provider: asset.provider,
+      storyboardAssetType: prompt.assetType,
+      generatedAssetType: asset.assetType,
+      originalPrompt: prompt.imagePrompt,
+      generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
+      videoPrompt: prompt.videoPrompt,
+      issue: review.issue,
+      promptChange: review.promptChange,
+      status: review.status,
+      assetPath: asset.relativePath
+    };
+    retryReviewLines.push(reviewEntry);
+    visualReviewLines.push({
+      timestamp: reviewEntry.timestamp,
+      retry: true,
+      shotId,
+      status: review.status,
+      provider: asset.provider,
+      assetPath: asset.relativePath,
+      notes: review.issue || "accepted after targeted retry"
+    });
+    retriedShotIds.push(shotId);
+    if (review.status !== "accepted") continue;
+
+    acceptedShotIds.add(shotId);
+    const nextManifestShot = {
+      ...(existingManifestShot ?? {}),
+      shotId,
+      order: prompt.order,
+      category: manifest.category,
+      assetType: asset.assetType,
+      storyboardAssetType: existingManifestShot?.storyboardAssetType ?? prompt.assetType,
+      provider: asset.provider,
+      assetPath: asset.relativePath,
+      durationSeconds: existingManifestShot?.durationSeconds ?? (prompt.assetType === "video" ? 5 : 3),
+      captionText: prompt.line,
+      suggestedEdit: buildSuggestedEdit({ ...asset, prompt, storyboardAssetType: prompt.assetType }),
+      promptPreset: prompt.presetId,
+      attempts: attempt
+    };
+    const manifestIndex = manifest.shots.findIndex((shot) => shot.shotId === shotId);
+    if (manifestIndex >= 0) {
+      manifest.shots[manifestIndex] = nextManifestShot;
+    } else {
+      manifest.shots.push(nextManifestShot);
+    }
+  }
+
+  manifest.shots.sort((left, right) => Number(left.order) - Number(right.order));
+  const nextNeedsManualReview = needsManualReview.filter((item) => !acceptedShotIds.has(item.shotId));
+  for (const entry of retryReviewLines) {
+    if (entry.status === "accepted") continue;
+    nextNeedsManualReview.push({
+      shotId: entry.shotId,
+      attempts: entry.attempt,
+      reason: `${entry.issue}; manual review required after targeted retry`,
+      prompt: entry.originalPrompt,
+      generationPrompt: entry.generationPrompt
+    });
+  }
+
+  await writeJson(promptsPath, prompts);
+  await writeJson(manifestPath, manifest);
+  await writeText(path.join(packageDir, "06_editing_package/editing_manifest.csv"), toCsv(manifest.shots));
+  await appendJsonLines(path.join(packageDir, "07_review_log/prompt_iterations.jsonl"), retryReviewLines);
+  await appendJsonLines(path.join(packageDir, "07_review_log/visual_review.jsonl"), visualReviewLines);
+  await writeJson(needsManualPath, nextNeedsManualReview);
+  const originalScript = await readFile(path.join(packageDir, "00_script/original.txt"), "utf8").catch(() => "");
+  await upsertPackageIndex({
+    outputRoot: path.dirname(packageDir),
+    entry: {
+      slug: path.basename(packageDir).replace(/^\d{4}-\d{2}-\d{2}-/u, ""),
+      packageName: path.basename(packageDir),
+      scriptTitle: firstScriptTitle(originalScript),
+      provider,
+      mode: manifest.mode ?? "test",
+      status: "completed",
+      path: packageDir,
+      generated: {
+        total: manifest.shots.length,
+        accepted: manifest.shots.length,
+        failed: nextNeedsManualReview.length
+      },
+      manualReview: nextNeedsManualReview.length,
+      lastRetry: {
+        shotIds: retriedShotIds,
+        accepted: [...acceptedShotIds]
+      }
+    }
+  });
+
+  return {
+    packageDir,
+    retriedShotIds,
+    acceptedShotIds: [...acceptedShotIds],
+    manualReview: nextNeedsManualReview.filter((item) => requestedShotIds.includes(item.shotId))
+  };
 }
 
 function normalizeOptions(options) {
@@ -133,12 +367,16 @@ function normalizeOptions(options) {
       modelVersion: options.dreamina?.modelVersion ?? "4.0",
       resolutionType: options.dreamina?.resolutionType ?? "2k",
       ratio: options.dreamina?.ratio ?? "9:16",
-      pollSeconds: Number(options.dreamina?.pollSeconds ?? 90)
+      pollSeconds: Number(options.dreamina?.pollSeconds ?? 90),
+      sessionId: options.dreamina?.sessionId,
+      sessionName: normalizeDreaminaSessionName(options.dreamina?.sessionName ?? `tiktok-${slugify(options.slug ?? "tiktok-content")}`),
+      concurrency: Number(options.dreamina?.concurrency ?? 2)
     },
     now: options.now ?? new Date(),
     language: options.language ?? "en-US",
     region: options.region ?? "United States",
     category: options.category,
+    resumeFrom: options.resumeFrom,
     forceRejectShotIds: new Set(options.forceRejectShotIds ?? [])
   };
 }
@@ -157,6 +395,52 @@ async function createPackageDirectories(packageDir) {
   await Promise.all(dirs.map((dir) => mkdir(path.join(packageDir, dir), { recursive: true })));
 }
 
+async function resetPipelineCheckpoints(packageDir) {
+  await writeText(path.join(packageDir, "07_review_log/pipeline_checkpoints.jsonl"), "");
+}
+
+async function recordPipelineCheckpoint(packageDir, config, phase, details = {}) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    phase,
+    status: details.status ?? "completed",
+    provider: config.provider,
+    mode: config.mode
+  };
+  if (config.resumeFrom) {
+    entry.resumeFrom = config.resumeFrom;
+    entry.resumed = phase === config.resumeFrom;
+  }
+  const rest = { ...details };
+  delete rest.status;
+  Object.assign(entry, rest);
+  await appendFile(path.join(packageDir, "07_review_log/pipeline_checkpoints.jsonl"), JSON.stringify(entry) + "\n", "utf8");
+}
+
+async function resolveDreaminaSessionIfNeeded(config) {
+  if (!usesDreaminaProvider(config)) return;
+  if (config.providerAdapters.dreaminaImage) return;
+  if (config.dreamina.sessionId || !config.dreamina.sessionName) return;
+  const searched = await runProviderCommand("dreamina", ["session", "search", config.dreamina.sessionName]).catch(() => ({
+    stdout: ""
+  }));
+  const existingId = extractDreaminaSessionId(searched.stdout);
+  if (existingId) {
+    config.dreamina.sessionId = existingId;
+    return;
+  }
+  const created = await runProviderCommand("dreamina", ["session", "create", config.dreamina.sessionName]);
+  const createdId = extractDreaminaSessionId(created.stdout);
+  if (!createdId) {
+    throw new Error(`Dreamina session could not be resolved or created for ${config.dreamina.sessionName}`);
+  }
+  config.dreamina.sessionId = createdId;
+}
+
+function usesDreaminaProvider(config) {
+  return config.provider === "dreamina-image" || config.provider === "image-mvp";
+}
+
 function inferCategory(script) {
   const text = script.toLowerCase();
   if (/(child|children|kid|parent|school|raise|family|teacher)/.test(text)) return "raise_children";
@@ -172,6 +456,20 @@ function localizeScript(script, language, region) {
     "Keep the book title unchanged. Replace culturally specific details with locally plausible US examples.",
     normalized
   ].join("\n");
+}
+
+function firstScriptTitle(script) {
+  return splitSentences(script)[0] || script.trim().split(/\r?\n/)[0] || "Untitled script";
+}
+
+function shouldReusePhaseOutput(config, phase) {
+  if (!config.resumeFrom) return false;
+  return phaseOrder(config.resumeFrom) > phaseOrder(phase);
+}
+
+function phaseOrder(phase) {
+  const index = PIPELINE_PHASES.indexOf(phase);
+  return index >= 0 ? index : -1;
 }
 
 function splitSentences(script) {
@@ -270,7 +568,7 @@ function buildPromptForShot(shot, category) {
     "竖版单张电影插画剧照，现代美式插画质感，暖色室内光线，真实人体比例，人物表情清楚，画面有现实家庭故事的戏剧张力。",
     "成人家庭边界冲突主题，普通美国家庭住宅场景，人物克制但情绪紧张，主体占据画面大部分，底部只保留少量干净负空间。",
     "竖版构图，单幅完整画面，不要多格画面，不要拼贴，不要左右分屏，不要界面叠层。",
-    "无字版画面，只呈现人物、环境和物件，不要出现任何文字，不要标题，不要气泡对白，不要水印，不要商标，不要数字，不要界面元素，不要把提示词里的任何字符画进画面。",
+    "无字版画面，只呈现人物、环境和物件，不要出现任何文字，不要标题，不要水印，不要商标，不要数字，不要界面元素，不要把提示词里的任何字符画进画面。",
     `画面内容：${translateVisualBeatForDreamina(shot)}。`,
     `主体重点：${translateSubjectTag(shot.subjectTag)}。`,
     `镜头感觉：${translateCameraForDreamina(camera)}。`,
@@ -296,8 +594,14 @@ function buildPromptForShot(shot, category) {
 }
 
 function translateVisualBeatForDreamina(shot) {
+  if (shot.id === "S015") {
+    return "明亮家庭客厅中景，沙发和餐桌干净可见，成年人站在画面中央认真沟通，前景无遮挡，地面和桌下保持明亮清爽，画面稳定通透";
+  }
+  if (shot.id === "S016") {
+    return "两位成年人一前一后形成紧张站位，一人后退保护家庭空间，另一人拎包停在门口，靠表情、距离和手势表现冲突";
+  }
   if (shot.section === "hook_video") {
-    return `用明显的家庭冲突开场，成年人围绕家庭边界、亲戚照顾和家中压力发生克制但紧张的对峙，画面只表现情境，不写任何台词`;
+    return `用明显的家庭冲突开场，成年人围绕家庭边界、亲戚照顾和家中压力发生克制但紧张的对峙，画面只表现情境`;
   }
   if (shot.section === "conversion") {
     return `把故事教训自然连接到成年人阅读思考的场景，保留前面的家庭边界故事语境，纸质读物只露出翻开的空白页面`;
@@ -354,71 +658,149 @@ function translateCameraForDreamina(camera) {
   return "稳定画面，适合后期在剪映里做缓慢放大或平移";
 }
 
+function applyRetryPromptFixes(prompt) {
+  if (prompt.shotId === "S015") {
+    return replaceDreaminaScene(prompt, "明亮家庭客厅中景，沙发和餐桌干净可见，成年人站在画面中央认真沟通，前景无遮挡，地面和桌下保持明亮清爽，画面稳定通透");
+  }
+  if (prompt.shotId === "S016") {
+    return replaceDreaminaScene(prompt, "两位成年人一前一后形成紧张站位，一人后退保护家庭空间，另一人拎包停在门口，靠表情、距离和手势表现冲突");
+  }
+  return { ...prompt };
+}
+
+function replaceDreaminaScene(prompt, scene) {
+  const generationPrompt = String(prompt.generationPrompt ?? prompt.imagePrompt).replace(
+    /画面内容：[^。]+。/u,
+    `画面内容：${scene}。`
+  );
+  return { ...prompt, generationPrompt };
+}
+
 async function generateAndReviewAssets({ packageDir, prompts, config, forceRejectShotIds }) {
+  if (config.provider === "dreamina-image" && Number(config.dreamina.concurrency) > 1) {
+    const queueResults = await runDreaminaQueue({
+      items: prompts,
+      concurrency: config.dreamina.concurrency,
+      worker: (prompt) => generateAndReviewPrompt({ packageDir, prompt, config, forceRejectShotIds })
+    });
+    return mergePromptReviewResults(queueResults);
+  }
+
+  const promptResults = [];
+  for (const prompt of prompts) {
+    promptResults.push({
+      status: "fulfilled",
+      item: prompt,
+      value: await generateAndReviewPrompt({ packageDir, prompt, config, forceRejectShotIds })
+    });
+  }
+  return mergePromptReviewResults(promptResults);
+}
+
+async function generateAndReviewPrompt({ packageDir, prompt, config, forceRejectShotIds }) {
   const acceptedAssets = [];
   const reviewLines = [];
   const needsManualReview = [];
 
-  for (const prompt of prompts) {
-    let accepted = false;
-    let lastReason = "";
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const route = selectProviderRoute(prompt, config);
-      let asset;
-      try {
-        asset = await generateAssetWithProvider({ packageDir, prompt, attempt, route, config });
-      } catch (error) {
-        const issue = `provider_error: ${formatProviderError(error)}`;
-        reviewLines.push(JSON.stringify({
-          shotId: prompt.shotId,
-          attempt,
-          provider: route.providerName,
-          storyboardAssetType: prompt.assetType,
-          generatedAssetType: route.assetType,
-          originalPrompt: prompt.imagePrompt,
-          generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
-          videoPrompt: prompt.videoPrompt,
-          issue,
-          promptChange: "retry the same prompt once; if the provider keeps failing, inspect provider logs or simplify the provider prompt",
-          status: "rejected",
-          assetPath: ""
-        }));
-        lastReason = issue;
-        continue;
+  let accepted = false;
+  let lastReason = "";
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const route = selectProviderRoute(prompt, config);
+    let asset;
+    try {
+      asset = await generateAssetWithProvider({ packageDir, prompt, attempt, route, config });
+    } catch (error) {
+      if (route.providerName === "dreamina-image") {
+        config.dreamina.concurrency = nextDreaminaConcurrency({ current: config.dreamina.concurrency, error });
       }
-      const review = reviewAsset(prompt, asset, forceRejectShotIds.has(prompt.shotId));
+      const issue = `provider_error: ${formatProviderError(error)}`;
       reviewLines.push(JSON.stringify({
         shotId: prompt.shotId,
         attempt,
-        provider: asset.provider,
+        provider: route.providerName,
         storyboardAssetType: prompt.assetType,
-        generatedAssetType: asset.assetType,
+        generatedAssetType: route.assetType,
         originalPrompt: prompt.imagePrompt,
         generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
         videoPrompt: prompt.videoPrompt,
-        issue: review.issue,
-        promptChange: review.promptChange,
-        status: review.status,
-        assetPath: asset.relativePath
+        issue,
+        promptChange: "retry the same prompt once; if the provider keeps failing, inspect provider logs or simplify the provider prompt",
+        status: "rejected",
+        assetPath: ""
       }));
-      if (review.status === "accepted") {
-        acceptedAssets.push({ ...asset, prompt, attempts: attempt, storyboardAssetType: prompt.assetType });
-        accepted = true;
-        break;
-      }
-      lastReason = review.issue;
+      lastReason = issue;
+      continue;
     }
-    if (!accepted) {
+    const review = reviewAsset(prompt, asset, forceRejectShotIds.has(prompt.shotId));
+    reviewLines.push(JSON.stringify({
+      shotId: prompt.shotId,
+      attempt,
+      provider: asset.provider,
+      storyboardAssetType: prompt.assetType,
+      generatedAssetType: asset.assetType,
+      originalPrompt: prompt.imagePrompt,
+      generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
+      videoPrompt: prompt.videoPrompt,
+      issue: review.issue,
+      promptChange: review.promptChange,
+      status: review.status,
+      assetPath: asset.relativePath
+    }));
+    if (review.status === "accepted") {
+      acceptedAssets.push({ ...asset, prompt, attempts: attempt, storyboardAssetType: prompt.assetType });
+      accepted = true;
+      break;
+    }
+    lastReason = review.issue;
+  }
+  if (!accepted) {
+    needsManualReview.push({
+      shotId: prompt.shotId,
+      attempts: 3,
+      reason: `${lastReason}; manual review required after max retries`,
+      prompt: prompt.imagePrompt,
+      generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
+    });
+  }
+  return { acceptedAssets, reviewLines, needsManualReview };
+}
+
+function mergePromptReviewResults(results) {
+  const acceptedAssets = [];
+  const reviewLines = [];
+  const needsManualReview = [];
+  for (const result of results) {
+    if (result.status === "rejected") {
+      const prompt = result.item;
+      const issue = `provider_error: ${formatProviderError(result.reason)}`;
+      reviewLines.push(JSON.stringify({
+        shotId: prompt.shotId,
+        attempt: 1,
+        provider: "dreamina-image",
+        storyboardAssetType: prompt.assetType,
+        generatedAssetType: "image",
+        originalPrompt: prompt.imagePrompt,
+        generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
+        videoPrompt: prompt.videoPrompt,
+        issue,
+        promptChange: "retry this shot with lower provider concurrency",
+        status: "rejected",
+        assetPath: ""
+      }));
       needsManualReview.push({
         shotId: prompt.shotId,
-        attempts: 3,
-        reason: `${lastReason}; manual review required after max retries`,
+        attempts: 1,
+        reason: `${issue}; manual review required after queue failure`,
         prompt: prompt.imagePrompt,
         generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
       });
+      continue;
     }
+    acceptedAssets.push(...result.value.acceptedAssets);
+    reviewLines.push(...result.value.reviewLines);
+    needsManualReview.push(...result.value.needsManualReview);
   }
-
+  acceptedAssets.sort((left, right) => left.prompt.order - right.prompt.order);
   return { acceptedAssets, reviewLines, needsManualReview };
 }
 
@@ -470,7 +852,7 @@ async function generateAssetWithProvider({ packageDir, prompt, attempt, route, c
     return generateDreaminaImageAsset({ packageDir, prompt, attempt, folder: route.folder, config });
   }
   if (route.providerName === "chatgpt-web-image2") {
-    return generateChatGptWebImage2Asset({ packageDir, prompt, attempt, folder: route.folder });
+    return generateChatGptWebImage2Asset({ packageDir, prompt, attempt, folder: route.folder, config });
   }
   throw new Error(`unsupported provider route: ${route.providerName}`);
 }
@@ -503,16 +885,10 @@ async function generateMockAsset(packageDir, prompt, provider, attempt, route = 
 async function generateDreaminaImageAsset({ packageDir, prompt, attempt, folder, config }) {
   const downloadDir = path.join(packageDir, folder, `${prompt.shotId}_dreamina_a${attempt}_download`);
   await mkdir(downloadDir, { recursive: true });
-  const args = [
-    "text2image",
-    `--prompt=${prompt.generationPrompt ?? prompt.imagePrompt}`,
-    `--ratio=${config.dreamina.ratio}`,
-    `--resolution_type=${config.dreamina.resolutionType}`,
-    `--poll=${config.dreamina.pollSeconds}`
-  ];
-  if (config.dreamina.modelVersion) {
-    args.push(`--model_version=${config.dreamina.modelVersion}`);
-  }
+  const args = buildDreaminaText2ImageArgs({
+    prompt: prompt.generationPrompt ?? prompt.imagePrompt,
+    dreamina: config.dreamina
+  });
   const submitted = await runProviderCommand("dreamina", args);
   const submitId = extractSubmitId(submitted.stdout);
   if (!submitId) {
@@ -551,9 +927,24 @@ async function generateDreaminaImageAsset({ packageDir, prompt, attempt, folder,
   };
 }
 
-async function generateChatGptWebImage2Asset({ packageDir, prompt, attempt, folder }) {
+async function generateChatGptWebImage2Asset({ packageDir, prompt, attempt, folder, config }) {
   const taskDir = path.join(packageDir, "07_review_log", "chatgpt_web_tasks");
   await mkdir(taskDir, { recursive: true });
+  const sessionPath = path.join(packageDir, "07_review_log", "chatgpt_session.json");
+  await writeJson(sessionPath, {
+    provider: "chatgpt-web-image2",
+    model: "image-2",
+    packageSlug: config.slug,
+    conversationReuse: "one conversation per script",
+    maxTemporaryTabs: 1,
+    batchPolicy: {
+      initial: 3,
+      stable: 5,
+      maximum: 10,
+      fallbackOnQualityIssue: 1
+    },
+    status: "pending-browser-adapter"
+  });
   await writeJson(path.join(taskDir, `${prompt.shotId}_a${attempt}.json`), {
     provider: "chatgpt-web-image2",
     model: "image-2",
@@ -766,6 +1157,31 @@ async function writeJson(filePath, value) {
   await writeText(filePath, JSON.stringify(value, null, 2) + "\n");
 }
 
+async function readJsonOrDefault(filePath, fallback) {
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return fallback;
+    throw error;
+  }
+}
+
+async function maybeReadJson(filePath, shouldRead) {
+  if (!shouldRead) return undefined;
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+async function appendJsonLines(filePath, entries) {
+  if (!entries.length) return;
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await appendFile(filePath, entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n", "utf8");
+}
+
 async function writeText(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, value, "utf8");
@@ -778,6 +1194,11 @@ function slugify(value) {
     .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || "tiktok-content";
+}
+
+function normalizeDreaminaSessionName(value) {
+  const normalized = String(value ?? "tiktok-content").trim() || "tiktok-content";
+  return normalized.slice(0, 50);
 }
 
 function formatLocalDate(date) {

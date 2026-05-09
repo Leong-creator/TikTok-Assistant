@@ -31,6 +31,9 @@ Complete the MVP without stopping at documentation only: a script must become a 
 - Every generated asset must be reviewed against: shot intent, preset style, vertical format, subject clarity, caption space, and scene logic.
 - Rejected shots may retry twice. After three attempts they must be listed in `07_review_log/needs_manual_review.json`.
 - Prompt iterations must be written as JSONL in `07_review_log/prompt_iterations.jsonl`.
+- Each pipeline phase must write `07_review_log/pipeline_checkpoints.jsonl`.
+- Each package run must update `outputs/.index.json`.
+- ChatGPT browser downloads must be moved into the package folder and logged in `07_review_log/download_moves.jsonl`.
 
 ## Folder Contract
 
