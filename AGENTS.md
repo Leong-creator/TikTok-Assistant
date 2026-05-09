@@ -46,6 +46,9 @@ Complete the MVP without stopping at documentation only: a script must become a 
 ## Prompt Review Loop
 
 - Every shot must have a saved image prompt and video prompt before generation.
+- ChatGPT web image prompts must use the fixed image-generation contract: start with an explicit create/draw command, state one output unit, then provide structured fields for style, subject type, shot intent, composition/camera, character setup, action/relationship, micro-expression, background, lighting/dynamics, and negative constraints. Do not mix workflow instructions, review policy, or long script context into the image prompt sent to ChatGPT.
+- ChatGPT batch generation may only batch prompts that already work as single-image prompts. Start with one image; if accepted, batch 2-3. Only grow to 5/10 after the page returns separate image outputs, not a storyboard page. If ChatGPT combines shots into a grid/panel page or answers with analysis, treat the prompt format as failed and return to single-image prompts or explicitly select the image tool in the Chrome plugin.
+- For ChatGPT, shot labels such as `S004` may appear in the surrounding message text or manifest, but the image prompt itself must say that labels/text must not be drawn. Prefer "Image 1 / Image 2" for batch grouping rather than repeated shot IDs inside the creative body.
 - Every generated asset must be reviewed against: shot intent, preset style, vertical format, subject clarity, full-frame composition, and scene logic.
 - Review must also score TikTok hook strength: visual shock, conflict, curiosity gap, money/status contrast, emotional tension, and whether the image can stop scrolling in the first second.
 - ChatGPT web images are reviewed in the page before download; accepted images are then downloaded and collected into the package.

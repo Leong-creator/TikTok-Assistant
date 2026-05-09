@@ -16,9 +16,18 @@ Key-image adapter:
 
 1. Use Codex Chrome extension backend when ChatGPT is already logged in.
 2. Select/use ChatGPT web `image-2` only.
-3. Submit only the selected key-image prompts.
-4. Save generated assets into `03_key_images_chatgpt/`.
-5. Run the same review loop and prompt iteration log.
+3. Submit only provider-compiled image prompts, not raw script text or workflow instructions.
+4. Start with one image prompt. If accepted, batch 2-3. Only grow to 5/10 after ChatGPT returns separate standalone images without panel/grid merging.
+5. Save generated assets into `03_key_images_chatgpt/`.
+6. Run the same review loop and prompt iteration log.
+
+Prompt contract:
+
+- Begin with a direct image command: `Create one image now.` or `Create N separate images now, one image per item below.`
+- Put aspect/output rules before creative content: one standalone `9:16` vertical full-frame image; no collage, storyboard page, split-screen, panel grid, picture-in-picture, or sequence.
+- Use structured fields: style, subject type, shot intent, camera/composition, characters, action/relationship, micro-expression, background, lighting/dynamics, negative constraints.
+- Keep shot IDs, review rules, provider notes, and download instructions outside the creative prompt body. They belong in Codex manifests and logs.
+- If ChatGPT answers with analysis, rewrites the prompt, or merges shots into one page, record a provider prompt failure and retry with a shorter single-image prompt or explicitly select the image tool through the Codex Chrome plugin.
 
 No fallback is allowed for this provider. If `image-2` is not available or the page refuses generation, record a blocker instead of using OpenAI API, Codex image generation, or another ChatGPT image model.
 

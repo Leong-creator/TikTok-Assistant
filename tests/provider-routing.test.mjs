@@ -157,6 +157,45 @@ test("provider generation prompts omit shot labels and forbid panels or text", a
   }
 });
 
+test("ChatGPT web image prompts use the fixed image-generation contract", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-chatgpt-prompt-"));
+  const chatgptPrompts = [];
+  try {
+    await generateAssetPackage({
+      script,
+      outputRoot: root,
+      slug: "chatgpt-prompt-contract",
+      mode: "test",
+      provider: "image-mvp",
+      imageOnly: true,
+      now: new Date("2026-05-09T00:00:00+08:00"),
+      providerAdapters: {
+        chatgptWebImage2: {
+          async generate({ packageDir, prompt, folder, attempt }) {
+            chatgptPrompts.push(prompt.imagePrompt);
+            return fakeImageProvider("chatgpt-web-image2", []).generate({ packageDir, prompt, folder, attempt });
+          }
+        },
+        dreaminaImage: fakeImageProvider("dreamina-image", [])
+      }
+    });
+
+    assert.ok(chatgptPrompts.length > 0);
+    assert.ok(chatgptPrompts.every((prompt) => prompt.startsWith("Create one image now.")));
+    assert.ok(chatgptPrompts.every((prompt) => /Output: one standalone 9:16 vertical full-frame image/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => /Subject type:/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => /Shot intent:/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => /Camera\/composition:/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => /Characters:/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => /Action\/relationship:/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => /Micro-expression:/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => /Negative constraints:/.test(prompt)));
+    assert.ok(chatgptPrompts.every((prompt) => !/Shot S\d{3}:/.test(prompt)));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("provider failures are logged and do not stop remaining shots", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "tk-provider-failure-"));
   const calls = [];

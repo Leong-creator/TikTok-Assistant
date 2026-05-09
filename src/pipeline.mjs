@@ -700,14 +700,7 @@ function buildPromptForShot(shot, taxonomy) {
   const presetId = choosePresetForShot(shot, taxonomy);
   const preset = PRESETS[presetId];
   const camera = shot.assetType === "video" ? "slow push-in, subtle parallax, cinematic handheld tension" : "stable frame for Ken Burns zoom";
-  const imagePrompt = [
-    `${BASE_VISUAL_STYLE}. ${preset.style}.`,
-    "9:16 vertical composition, single coherent scene, no collage panels, no Chinese text.",
-    `Shot ${shot.id}: ${shot.visualBeat}`,
-    `Subject tag: ${shot.subjectTag}.`,
-    `Camera: ${camera}.`,
-    "Include clear adult character actions, expressive micro-emotions, US-local environment details, warm cinematic light, and full-frame vertical storytelling with no artificial blank bands."
-  ].join(" ");
+  const imagePrompt = buildChatGptImagePrompt({ shot, taxonomy, preset, camera });
   const generationPrompt = [
     "竖版单张电影插画剧照，现代美式插画质感，暖色电影光线，真实人体比例，人物表情清楚，画面有现实商业故事的戏剧张力。",
     `${buildDreaminaStyleLine(shot, taxonomy)}`,
@@ -740,6 +733,50 @@ function buildPromptForShot(shot, taxonomy) {
     generationPrompt,
     videoPrompt
   };
+}
+
+function buildChatGptImagePrompt({ shot, taxonomy, preset, camera }) {
+  const characters = buildChatGptCharacterLine(shot, taxonomy);
+  return [
+    "Create one image now.",
+    "Output: one standalone 9:16 vertical full-frame image. Do not create a collage, storyboard page, split screen, panel grid, picture-in-picture, or sequence.",
+    `Style: ${BASE_VISUAL_STYLE}. ${preset.style}. Premium TikTok story-ad illustration, cinematic warm light, realistic adult proportions, high-detail 4K look, clean stable composition.`,
+    `Subject type: ${shot.subjectTag}.`,
+    `Shot intent: ${shot.visualBeat}`,
+    `Camera/composition: ${camera}; make the main action readable in foreground and midground, with useful background details for later Ken Burns movement.`,
+    `Characters: ${characters}`,
+    `Action/relationship: ${shot.visualBeat}`,
+    "Micro-expression: emphasize curiosity, conflict, status pressure, jealousy, surprise, or controlled confidence so the image can stop scrolling in the first second.",
+    `Background: ${buildChatGptBackgroundLine(shot, taxonomy)}`,
+    "Lighting/dynamics: warm cinematic side light, visible money/status contrast when relevant, full-frame visual density from top to bottom with no artificial blank bands.",
+    "Negative constraints: no visible words, letters, numbers, captions, speech bubbles, logos, watermarks, subtitles, blank bottom band, extra limbs, distorted faces, unrelated scenes, Chinese text, or drawn shot labels."
+  ].join("\n");
+}
+
+function buildChatGptCharacterLine(shot, taxonomy) {
+  if (shot.section === "conversion" && taxonomy.productCategory === "raise_children") {
+    return "American parent, child, or mentor figures with realistic adult and child proportions; keep product/education visuals only in the conversion section.";
+  }
+  if (taxonomy.storyCategory === "make_money" || taxonomy.storyCategory === "business") {
+    return "Consistent adult American business-story cast: confident young male lead, luxury service workers, managers, coworkers, wealthy buyers, and a wealthy father mentor when needed.";
+  }
+  if (taxonomy.storyCategory === "people_skill") {
+    return "Adult American social-conflict cast with realistic proportions, clear status differences, and expressive but believable body language.";
+  }
+  return "Adult American realistic story characters with consistent styling, clear body language, and readable emotional reactions.";
+}
+
+function buildChatGptBackgroundLine(shot, taxonomy) {
+  if (shot.section === "conversion" && taxonomy.productCategory === "raise_children") {
+    return "warm American family learning space, table, papers or book-like objects without readable text, practical financial-literacy mood.";
+  }
+  if (taxonomy.storyCategory === "make_money" || taxonomy.storyCategory === "business") {
+    return "US luxury hotel, real-estate office, high-end car dealership, wealthy study, restaurant, cash, contracts, property models, or luxury objects matching this shot.";
+  }
+  if (taxonomy.storyCategory === "raise_children") {
+    return "American home interior, doorway, living room, dining table, or practical family decision scene matching this shot.";
+  }
+  return "US-local scene details and props matching this story beat.";
 }
 
 function choosePresetForShot(shot, taxonomy) {
@@ -777,10 +814,11 @@ function translateVisualBeatForDreamina(shot) {
   if (shot.section === "conversion" && shot.productCategory === "raise_children") {
     return "父母把赚钱故事里的规则讲给孩子听，孩子在旁边认真思考，桌上有翻开的空白纸页和生活物件，画面表达财商、人情世故和现实判断的教育承接";
   }
-  if (shot.id === "S015") {
+  const isParentingStory = shot.storyCategory === "raise_children" && shot.productCategory === "raise_children";
+  if (isParentingStory && shot.id === "S015") {
     return "明亮家庭客厅中景，沙发和餐桌干净可见，成年人站在画面中央认真沟通，前景无遮挡，地面和桌下保持明亮清爽，画面稳定通透";
   }
-  if (shot.id === "S016") {
+  if (isParentingStory && shot.id === "S016") {
     return "两位成年人一前一后形成紧张站位，一人后退保护家庭空间，另一人拎包停在门口，靠表情、距离和手势表现冲突";
   }
   if (shot.section === "hook_video") {
@@ -880,10 +918,11 @@ function translateCameraForDreamina(camera) {
 }
 
 function applyRetryPromptFixes(prompt) {
-  if (prompt.shotId === "S015") {
+  const isParentingStory = prompt.storyCategory === "raise_children" && prompt.productCategory === "raise_children";
+  if (isParentingStory && prompt.shotId === "S015") {
     return replaceDreaminaScene(prompt, "明亮家庭客厅中景，沙发和餐桌干净可见，成年人站在画面中央认真沟通，前景无遮挡，地面和桌下保持明亮清爽，画面稳定通透");
   }
-  if (prompt.shotId === "S016") {
+  if (isParentingStory && prompt.shotId === "S016") {
     return replaceDreaminaScene(prompt, "两位成年人一前一后形成紧张站位，一人后退保护家庭空间，另一人拎包停在门口，靠表情、距离和手势表现冲突");
   }
   return { ...prompt };

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { generateAssetPackage } from "../src/pipeline.mjs";
+import { generateAssetPackage, retryPackageShots } from "../src/pipeline.mjs";
 
 const qdhoaudqScript = await readFile(new URL("../fixtures/qdhoaudq-43k-script.txt", import.meta.url), "utf8");
 
@@ -147,6 +147,41 @@ test("qdhoaudq script is cleaned from transcript fragments into story sentences"
     assert.match(cleanedLines[0], /California received a 20 million dollar settlement/i);
     assert.match(cleaned, /Ferrari dealership/i);
     assert.match(cleaned, /billionaire father/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("qdhoaudq retry does not apply unrelated parenting shot fixes to business Ferrari scenes", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-qdhoaudq-retry-business-"));
+  const calls = [];
+  try {
+    const result = await generateAssetPackage({
+      script: qdhoaudqScript,
+      outputRoot: root,
+      slug: "qdhoaudq-retry-business",
+      mode: "full",
+      provider: "mock",
+      imageOnly: true,
+      storyCategory: "make_money",
+      productCategory: "raise_children",
+      now: new Date("2026-05-09T00:00:00+08:00")
+    });
+
+    await retryPackageShots({
+      packageDir: result.packageDir,
+      shots: ["S015", "S016"],
+      provider: "dreamina-image",
+      now: new Date("2026-05-09T00:00:00+08:00"),
+      providerAdapters: {
+        dreaminaImage: fakeImageProvider("dreamina-image", calls)
+      }
+    });
+
+    const prompts = JSON.parse(await readFile(path.join(result.packageDir, "02_prompts/prompts.json"), "utf8"));
+    const retried = prompts.filter((prompt) => ["S015", "S016"].includes(prompt.shotId));
+    assert.ok(retried.every((prompt) => /豪车展厅|富有女性|销售员|跑车/.test(prompt.generationPrompt)));
+    assert.ok(retried.every((prompt) => !/家庭客厅|家庭空间|拎包停在门口/.test(prompt.generationPrompt)));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

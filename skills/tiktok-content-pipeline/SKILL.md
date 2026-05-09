@@ -22,7 +22,7 @@ Use this skill when the user provides a TikTok Shop script and wants Codex to pr
 8. Default stage sizes are `calibration` = 8 shots / 3 video first frames / 4 ChatGPT key images, and `pilot` = 20 shots / 8 video first frames / 8 ChatGPT key images.
 9. Route complex relationship, abstract business logic, hook, and conversion shots to ChatGPT web; route simple object, hotel, office, car, cash, contract, and single-person scenes to Dreamina.
 10. Before Dreamina generation, use GPT planning to compile raw script meaning into concise Chinese visual prompts. Dreamina should receive visual staging, not raw transcript logic.
-11. Reuse one ChatGPT conversation per script, use batch size 3 first, review images in the page before download, only grow to 5/10 after stable outputs, and move accepted browser downloads into the package folder.
+11. Reuse one ChatGPT conversation per script, but use the fixed ChatGPT image prompt contract. Start by generating one standalone image; after the format is accepted, batch 2-3, then only grow to 5/10 after ChatGPT returns separate images rather than a storyboard page. Review images in the page before download and move accepted browser downloads into the package folder.
 12. Use Dreamina CLI sessions and bounded concurrency:
    ```bash
    node src/cli.mjs --script fixtures/top01-reference-script.txt --slug top01-reference-dreamina --mode test --provider dreamina-image --image-only --dreamina-session top01-reference --dreamina-concurrency 2
@@ -50,5 +50,7 @@ Use this skill when the user provides a TikTok Shop script and wants Codex to pr
 - Browser tasks must use only the Codex Chrome plugin. Do not substitute system Chrome automation, in-app browser, standalone Playwright, or a custom browser tool.
 - ChatGPT image downloads should use Chrome plugin download/media APIs plus the existing `download-collector`; coordinate-click flows are last resort only after logging why semantic download controls failed.
 - ChatGPT generated images should be visually reviewed in the web conversation before download. Reject and retry style-mismatched images in the same conversation instead of collecting them.
+- ChatGPT web prompt format must be provider-specific. Start with an explicit "Create one image" or "Create N separate images" command, then use structured fields: style, output/aspect, subject type, shot intent, camera/composition, character setup, action/relationship, micro-expression, background, lighting/dynamics, and negative constraints. Do not paste long workflow instructions, review requirements, or full script context into the generation prompt.
+- If ChatGPT replies with analysis, rewrites the prompt, or merges several shots into one panel/grid page, record the batch as failed. Retry with a shorter single-image prompt or explicitly select the web image tool through the Codex Chrome plugin before continuing.
 - Rejections must become reusable learning: record the failure reason, update prompt presets or review heuristics when the issue is systematic, and reuse those lessons in future scripts.
 - Broad keywords must not override meaning. Distinguish real-estate commission, luxury-car commission, referral kickbacks, and family price negotiation before accepting generated assets.
