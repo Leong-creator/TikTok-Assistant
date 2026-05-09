@@ -5,7 +5,11 @@ import path from "node:path";
 import test from "node:test";
 
 import { createBatchPlanner } from "../src/batch-planner.mjs";
-import { collectDownloadedImages, snapshotDownloadDirectory } from "../src/download-collector.mjs";
+import {
+  applyCollectedImagesToManifest,
+  collectDownloadedImages,
+  snapshotDownloadDirectory
+} from "../src/download-collector.mjs";
 
 test("ChatGPT batch planner grows after clean batches and drops to one after quality failure", () => {
   const planner = createBatchPlanner({ initialSize: 3, maxSize: 10 });
@@ -64,6 +68,69 @@ test("download collector moves new ChatGPT files into the package and writes a m
     assert.equal(moveLines[0].shotId, "S001");
     assert.match(moveLines[0].from, /generated-one\.png$/);
     assert.match(moveLines[0].to, /S001_chatgpt-web-image2_a1\.png$/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("collected ChatGPT downloads can be reconciled into the editing manifest", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-download-manifest-"));
+  try {
+    const packageDir = path.join(root, "package");
+    await mkdir(path.join(packageDir, "06_editing_package"), { recursive: true });
+    await mkdir(path.join(packageDir, "03_key_images_chatgpt"), { recursive: true });
+    await writeFile(path.join(packageDir, "03_key_images_chatgpt/S001_chatgpt-web-image2_a2.png"), "real");
+
+    const manifest = {
+      provider: "mock",
+      shots: [
+        {
+          shotId: "S001",
+          order: 1,
+          category: "make_money",
+          storyCategory: "make_money",
+          productCategory: "raise_children",
+          assetType: "image",
+          storyboardAssetType: "video",
+          provider: "mock",
+          assetPath: "03_key_images_chatgpt/S001_mock.svg",
+          durationSeconds: 5,
+          captionText: "hook",
+          suggestedEdit: "push in",
+          promptPreset: "business-storyboard",
+          attempts: 1
+        }
+      ]
+    };
+    await writeFile(path.join(packageDir, "06_editing_package/editing_manifest.json"), JSON.stringify(manifest, null, 2));
+    await writeFile(path.join(packageDir, "06_editing_package/editing_manifest.csv"), "old");
+
+    const updates = await applyCollectedImagesToManifest({
+      packageDir,
+      moved: [
+        {
+          shotId: "S001",
+          provider: "chatgpt-web-image2",
+          attempt: 2,
+          to: path.join(packageDir, "03_key_images_chatgpt/S001_chatgpt-web-image2_a2.png")
+        }
+      ]
+    });
+
+    assert.deepEqual(updates, [
+      {
+        shotId: "S001",
+        provider: "chatgpt-web-image2",
+        assetPath: "03_key_images_chatgpt/S001_chatgpt-web-image2_a2.png",
+        attempts: 2
+      }
+    ]);
+    const updatedManifest = JSON.parse(await readFile(path.join(packageDir, "06_editing_package/editing_manifest.json"), "utf8"));
+    assert.equal(updatedManifest.shots[0].provider, "chatgpt-web-image2");
+    assert.equal(updatedManifest.shots[0].assetPath, "03_key_images_chatgpt/S001_chatgpt-web-image2_a2.png");
+    assert.equal(updatedManifest.shots[0].attempts, 2);
+    const csv = await readFile(path.join(packageDir, "06_editing_package/editing_manifest.csv"), "utf8");
+    assert.match(csv, /S001_chatgpt-web-image2_a2\.png/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -1,5 +1,9 @@
 # Provider Integration
 
+## Reuse-First Provider Rule
+
+Provider work must reuse mature, already available capabilities before adding new glue. Use `dreamina` CLI for Dreamina, `lark-cli` for Feishu, the Codex Chrome plugin for ChatGPT web, the existing provider queues for concurrency, and `download-collector` for browser download归档. Do not replace a provider path with another browser, API, or custom downloader unless the requested provider path is truly blocked and the blocker is logged.
+
 ## Current Providers
 
 ### `mock`
@@ -18,6 +22,13 @@ Key-image adapter:
 
 No fallback is allowed for this provider. If `image-2` is not available or the page refuses generation, record a blocker instead of using OpenAI API, Codex image generation, or another ChatGPT image model.
 
+Download handling must prefer the Chrome plugin's semantic download/media APIs and then `download-collector`. Coordinate-based downloading is a last resort only after logging that semantic download controls are not exposed.
+
+Visual review happens before download: inspect generated ChatGPT images in the web conversation first, retry style-mismatched shots in the same script conversation, and download only accepted images.
+For opening business shots, visual review must compare attraction strength with the reference material. A correct but quiet hotel scene should be rejected when the reference uses cash rain or stronger money-status shock.
+
+Observed ChatGPT web save path: click the accepted generated image to open the preview layer, click the preview `保存` control, then choose the `下载图片` menu item. After the file lands in Downloads, run `download-collector` and reconcile the moved file into `editing_manifest.json` / `editing_manifest.csv`.
+
 ### `dreamina-image`
 
 Dreamina image adapter:
@@ -30,7 +41,7 @@ Dreamina image adapter:
 
 Default image model: `4.0`, because the user's account currently treats it as free in testing. The default provider prompt is Chinese-only and avoids English, numbers, shot labels, book-cover wording, comic-page wording, ad-layout wording, poster wording, speech bubbles, and interface wording because model `4.0` otherwise tends to draw visible text or multi-panel layouts into the image.
 
-Observed quality note: Dreamina `4.0` is usable for low-cost bulk stills only after prompt cleanup. Earlier English/reference-style prompts produced panels and visible text. Wording such as "subtitle space" can also cause fake lower-third text. The stronger direction is Chinese-only, single-frame cinematic illustrated still, no text, clean negative space, no layout language.
+Observed quality note: Dreamina `4.0` is usable for low-cost bulk stills only after prompt cleanup. Earlier English/reference-style prompts produced panels and visible text. Wording such as "subtitle space" can also cause fake lower-third text or empty bottom bands. The stronger direction is Chinese-only, single-frame cinematic illustrated still, no text, full-frame composition, no layout language, and no requested caption area.
 
 This MVP does not run `dreamina image2video`.
 

@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readdir, rename, stat } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
@@ -50,6 +50,42 @@ export async function collectDownloadedImages(options) {
   return moved;
 }
 
+export async function applyCollectedImagesToManifest(options) {
+  const packageDir = options.packageDir;
+  const moved = options.moved ?? [];
+  const manifestPath = path.join(packageDir, "06_editing_package", "editing_manifest.json");
+  const csvPath = path.join(packageDir, "06_editing_package", "editing_manifest.csv");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const updates = [];
+
+  for (const item of moved) {
+    const shot = manifest.shots.find((candidate) => candidate.shotId === item.shotId);
+    if (!shot) continue;
+    const relativePath = path.relative(packageDir, item.to).replaceAll("\\", "/");
+    shot.provider = item.provider;
+    shot.assetPath = relativePath;
+    shot.assetType = "image";
+    shot.attempts = item.attempt;
+    updates.push({
+      shotId: item.shotId,
+      provider: item.provider,
+      assetPath: relativePath,
+      attempts: item.attempt
+    });
+  }
+
+  if (updates.length > 0) {
+    const providers = new Set(manifest.shots.map((shot) => shot.provider));
+    if (providers.size > 1) {
+      manifest.provider = "mixed";
+    }
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+    await writeFile(csvPath, toManifestCsv(manifest.shots), "utf8");
+  }
+
+  return updates;
+}
+
 async function listFiles(root) {
   const entries = await readdir(root, { withFileTypes: true }).catch((error) => {
     if (error.code === "ENOENT") return [];
@@ -72,4 +108,32 @@ async function listFiles(root) {
     });
   }
   return files;
+}
+
+function toManifestCsv(rows) {
+  const headers = [
+    "shotId",
+    "order",
+    "category",
+    "storyCategory",
+    "productCategory",
+    "assetType",
+    "storyboardAssetType",
+    "provider",
+    "assetPath",
+    "durationSeconds",
+    "captionText",
+    "suggestedEdit",
+    "promptPreset",
+    "attempts"
+  ];
+  return [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(","))
+  ].join("\n") + "\n";
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }

@@ -4,6 +4,18 @@ Generate a local CapCut-ready asset package from a TikTok Shop script.
 
 The MVP does not create a CapCut draft and does not depend on Dreamina-to-CapCut sync. It prepares a folder that a human editor can import into CapCut.
 
+## Implementation Rules
+
+This project is reuse-first. Before adding a new workaround, use existing mature capabilities: pipeline modules, provider adapters, `download-collector`, retry commands, `dreamina` CLI, `lark-cli`, enabled Codex plugins, and installed skills.
+
+All browser work must use the Codex Chrome plugin only. ChatGPT image downloads should use plugin download/media APIs plus the existing download collector; do not switch to another browser automation path or build a duplicate downloader.
+
+For ChatGPT web images, review the generated images in the page before downloading. Download only accepted images into the package; retry mismatched shots in the same conversation.
+
+Generated assets are reviewed for TikTok hook strength as well as prompt match. Failures must produce reusable lessons in review logs or prompt presets so future scripts reuse what was learned.
+For business hooks, a calm accurate scene can still fail if the reference-level lure is stronger. Opening beats should usually push visible money shock, cash rain, status contrast, or stunned reactions before quieter explanatory scenes.
+Image prompts should not reserve blank subtitle space. Captions are added over the image in CapCut, so assets should stay full-frame and visually complete.
+
 ## Quick Start
 
 Run tests:
@@ -37,6 +49,14 @@ npm run generate:top01:image-mvp
 ```
 
 `generate:top01:image-mvp` routes the first three key images to ChatGPT web `image-2` and the remaining stills to Dreamina. It requires a Codex browser adapter for ChatGPT web image generation; it must not fall back to OpenAI API or another ChatGPT image model. Dreamina prompts are Chinese-only and use `model_version=4.0` by default for free image tests.
+
+For longer scripts, routing counts are per run, not global constants. The `qdhoaudq_43k` sample uses a business-story wrapper for a raise-children product:
+
+```bash
+npm run generate:qdhoaudq:mock
+```
+
+That run uses `--total-shots 80`, `--video-shots 24`, and `--chatgpt-image-count 30` only for this script. Other scripts can use different counts.
 
 Run Dreamina with an explicit session and controlled concurrency:
 

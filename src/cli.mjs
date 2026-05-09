@@ -41,6 +41,13 @@ const result = await generateAssetPackage({
   provider: args.provider ?? "mock",
   imageOnly: Boolean(args["image-only"]),
   keyImageCount: args["key-image-count"] ? Number(args["key-image-count"]) : undefined,
+  totalShots: args["total-shots"] ? Number(args["total-shots"]) : undefined,
+  videoShots: args["video-shots"] ? Number(args["video-shots"]) : undefined,
+  chatgptImageCount: args["chatgpt-image-count"] ? Number(args["chatgpt-image-count"]) : undefined,
+  routingPlan: args["routing-plan"],
+  storyCategory: args["story-category"],
+  productCategory: args["product-category"],
+  conversionAngle: args["conversion-angle"],
   dreamina: {
     modelVersion: args["dreamina-model-version"],
     resolutionType: args["dreamina-resolution-type"],

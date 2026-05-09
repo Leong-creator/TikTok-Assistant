@@ -41,8 +41,17 @@ Each prompt must preserve:
 - No collage panels.
 - No visible text in any language in generated images.
 - Clear adult character action or clear object/symbol focus.
-- Caption-safe center or lower-third space.
+- Full-frame composition with no provider-requested caption or bottom space.
 
 ## Dreamina 4.0 Prompt Rule
 
 Use a Chinese-only provider prompt for Dreamina `4.0`. Avoid English, numbers, shot labels, and wording that sounds like a poster, cover, ad layout, comic page, speech bubble, or interface. The tested stable direction is closer to "vertical single-frame cinematic illustrated still" than "comic/storyboard".
+
+## Hook Strength Lessons
+
+- Money/business opening images must be scroll-stopping, not merely accurate. Prefer flying cash, shocked reactions, dramatic luxury contrast, commission checks, contracts, expensive cars, high-status rooms, or clear before/after status shifts.
+- A calm hotel lobby or comfortable suite can explain the story but may be weaker than a cash/status/conflict image for the first shot. Use calm lifestyle frames later after the hook is established.
+- If the original or reference video uses a stronger lure such as cash rain, a generated image that only shows a calm luxury setting should fail review even if it matches the sentence literally.
+- Broad money keywords need semantic routing. "Commission" can mean real estate, luxury-car sales, referral kickback, or family negotiation; choose the visual business context before choosing props.
+- Do not reserve blank bottom areas for subtitles. Later editing places subtitles over the image, so generated stills should stay visually complete from top to bottom.
+- When a generated image fails, preserve the reusable lesson in the review log and update this preset document if it affects future scripts.

@@ -91,10 +91,15 @@ test("provider generation prompts omit shot labels and forbid panels or text", a
     assert.ok(generatedPrompts.every((prompt) => !/Shot S\d{3}/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/\bCamera:/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => /单幅完整画面/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => /不要上下分屏/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => /不要画中画/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => /不要出现任何文字/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => /不要多格画面/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/漫画/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/字幕/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => !/底部.*负空间/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => !/大面积空白/.test(prompt)));
+    assert.ok(generatedPrompts.every((prompt) => /画面铺满|全画幅|不要预留/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/气泡/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/对白/.test(prompt)));
     assert.ok(generatedPrompts.every((prompt) => !/封面/.test(prompt)));
