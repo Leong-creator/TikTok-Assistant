@@ -34,6 +34,15 @@ Complete the MVP without stopping at documentation only: a script must become a 
 - Dreamina is for batch images and image-to-video after `dreamina login` is complete.
 - Paid generation must not run without explicit confirmation.
 
+## Long Script Production Stages
+
+- Long scripts must not start with full generation. Use staged production by default: `calibration` -> `pilot` -> script-specific `full`.
+- `calibration` is a small style and routing check: 8 shots, 3 video first-frame candidates, and 4 ChatGPT-routed key images by default.
+- `pilot` is a small production slice: 20 shots, 8 video first-frame candidates, and 8 ChatGPT-routed key images by default.
+- `full` shot counts are not global. Estimate them per script from script length, pacing, product category, and visual complexity. The qdhoaudq sample's 80 shots / 24 video first frames / 30 ChatGPT images are only that sample's settings.
+- After each stage, review failures and update prompt/routing rules before expanding. Do not continue to the next stage when calibration reveals provider mismatch, weak hook strength, bottom blank bands, or repeated multi-panel output.
+- Route complex relationship, abstract business logic, hook, and conversion shots to ChatGPT web first. Route simple single-person, object, hotel, office, car, cash, contract, and atmosphere shots to Dreamina.
+
 ## Prompt Review Loop
 
 - Every shot must have a saved image prompt and video prompt before generation.

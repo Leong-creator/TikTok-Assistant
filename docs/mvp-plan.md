@@ -34,11 +34,21 @@ Each phase writes `07_review_log/pipeline_checkpoints.jsonl`. The output root ke
 
 | Mode | Video shots | Image shots | Use |
 | --- | ---: | ---: | --- |
+| `calibration` | 3 | 5 | First pass for long scripts; validates style, provider routing, and prompt rules |
+| `pilot` | 8 | 12 | Small production slice after calibration passes |
 | `test` | 5 | 15 | MVP validation and prompt checking |
 | `standard` | 12 | 28 | Normal short production package |
 | `full` | 24 | 56 | Future 3-6 minute package |
 
-The mode values are defaults only. Long or short scripts can override `--total-shots`, `--video-shots`, and `--chatgpt-image-count` per run. Do not treat `80/24/30/50` as global limits; those are the current `qdhoaudq_43k` sample settings.
+The mode values are defaults only. Long or short scripts can override `--total-shots`, `--video-shots`, and `--chatgpt-image-count` per run. Do not treat `80/24/30/50` as global limits; those are only the current `qdhoaudq_43k` sample settings.
+
+Long scripts follow this fixed process:
+
+1. `calibration`: 8-shot style and provider check. Include opening hook, one simple Dreamina scene, one complex relationship scene, one conversion scene, and at least three future video first-frame candidates.
+2. `pilot`: 20-shot production slice after calibration passes. Expand only the validated style and provider routes.
+3. `full`: script-specific full package. Estimate shot count from script length and editing rhythm; do not reuse another script's count.
+
+Provider routing is staged too. Use GPT/ChatGPT to interpret the shot first, then either generate directly in ChatGPT for complex shots or compile a short Chinese Dreamina prompt for simple shots. Dreamina should receive visual instructions, not raw script logic.
 
 ## Formal Image-Only Test
 

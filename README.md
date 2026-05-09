@@ -50,13 +50,20 @@ npm run generate:top01:image-mvp
 
 `generate:top01:image-mvp` routes the first three key images to ChatGPT web `image-2` and the remaining stills to Dreamina. It requires a Codex browser adapter for ChatGPT web image generation; it must not fall back to OpenAI API or another ChatGPT image model. Dreamina prompts are Chinese-only and use `model_version=4.0` by default for free image tests.
 
-For longer scripts, routing counts are per run, not global constants. The `qdhoaudq_43k` sample uses a business-story wrapper for a raise-children product:
+For longer scripts, do not start with full generation. Use staged production:
+
+```bash
+node src/cli.mjs --script fixtures/qdhoaudq-43k-script.txt --slug qdhoaudq-calibration --mode calibration --provider image-mvp --image-only --story-category make_money --product-category raise_children
+node src/cli.mjs --script fixtures/qdhoaudq-43k-script.txt --slug qdhoaudq-pilot --mode pilot --provider image-mvp --image-only --story-category make_money --product-category raise_children
+```
+
+Only after calibration and pilot pass should a script-specific full run be planned. Routing counts are per run, not global constants. The `qdhoaudq_43k` sample uses a business-story wrapper for a raise-children product:
 
 ```bash
 npm run generate:qdhoaudq:mock
 ```
 
-That run uses `--total-shots 80`, `--video-shots 24`, and `--chatgpt-image-count 30` only for this script. Other scripts can use different counts.
+That run uses `--total-shots 80`, `--video-shots 24`, and `--chatgpt-image-count 30` only for this script. Other scripts must estimate their own counts from script length, pacing, product category, and visual complexity.
 
 Run Dreamina with an explicit session and controlled concurrency:
 

@@ -26,7 +26,7 @@ if (args["retry-package"]) {
 
 if (!args.script) {
   console.error(
-    "Usage: node src/cli.mjs --script <file> [--slug name] [--mode test|standard|full] [--provider mock|dreamina-image|chatgpt-web-image2|image-mvp] [--image-only]\n" +
+    "Usage: node src/cli.mjs --script <file> [--slug name] [--mode calibration|pilot|test|standard|full] [--provider mock|dreamina-image|chatgpt-web-image2|image-mvp] [--image-only]\n" +
       "Retry: node src/cli.mjs --retry-package <folder> --shots S015,S016 [--provider dreamina-image]"
   );
   process.exit(2);

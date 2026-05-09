@@ -65,6 +65,53 @@ test("image-mvp routes key images to ChatGPT web image-2 and bulk stills to Drea
   }
 });
 
+test("long-script staged modes start with calibration before pilot or full generation", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-staged-modes-"));
+  const calibrationCalls = [];
+  const pilotCalls = [];
+  try {
+    const calibration = await generateAssetPackage({
+      script,
+      outputRoot: root,
+      slug: "staged-calibration",
+      mode: "calibration",
+      provider: "image-mvp",
+      imageOnly: true,
+      now: new Date("2026-05-09T00:00:00+08:00"),
+      providerAdapters: {
+        chatgptWebImage2: fakeImageProvider("chatgpt-web-image2", calibrationCalls),
+        dreaminaImage: fakeImageProvider("dreamina-image", calibrationCalls)
+      }
+    });
+
+    assert.equal(calibration.summary.totalShots, 8);
+    assert.equal(calibration.summary.videoShots, 3);
+    assert.equal(calibration.summary.chatgptImageShots, 4);
+    assert.equal(calibration.summary.dreaminaImageShots, 4);
+
+    const pilot = await generateAssetPackage({
+      script,
+      outputRoot: root,
+      slug: "staged-pilot",
+      mode: "pilot",
+      provider: "image-mvp",
+      imageOnly: true,
+      now: new Date("2026-05-09T00:00:00+08:00"),
+      providerAdapters: {
+        chatgptWebImage2: fakeImageProvider("chatgpt-web-image2", pilotCalls),
+        dreaminaImage: fakeImageProvider("dreamina-image", pilotCalls)
+      }
+    });
+
+    assert.equal(pilot.summary.totalShots, 20);
+    assert.equal(pilot.summary.videoShots, 8);
+    assert.equal(pilot.summary.chatgptImageShots, 8);
+    assert.equal(pilot.summary.dreaminaImageShots, 12);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("provider generation prompts omit shot labels and forbid panels or text", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "tk-generation-prompt-"));
   const generatedPrompts = [];

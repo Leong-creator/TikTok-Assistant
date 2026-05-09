@@ -23,9 +23,11 @@ export const PIPELINE_PHASES = [
 ];
 
 const MODES = {
-  test: { totalShots: 20, videoShots: 5 },
-  standard: { totalShots: 40, videoShots: 12 },
-  full: { totalShots: 80, videoShots: 24 }
+  calibration: { totalShots: 8, videoShots: 3, chatgptImageCount: 4 },
+  pilot: { totalShots: 20, videoShots: 8, chatgptImageCount: 8 },
+  test: { totalShots: 20, videoShots: 5, chatgptImageCount: 3 },
+  standard: { totalShots: 40, videoShots: 12, chatgptImageCount: 12 },
+  full: { totalShots: 80, videoShots: 24, chatgptImageCount: 24 }
 };
 
 const PRESETS = {
@@ -371,7 +373,11 @@ function normalizeOptions(options) {
   const totalShots = normalizeCount(options.totalShots, modeConfig.totalShots, "totalShots");
   const videoShots = Math.min(normalizeCount(options.videoShots, modeConfig.videoShots, "videoShots"), totalShots);
   const chatgptImageCount = Math.min(
-    normalizeCount(options.chatgptImageCount ?? options.keyImageCount, options.keyImageCount ? Number(options.keyImageCount) : 3, "chatgptImageCount"),
+    normalizeCount(
+      options.chatgptImageCount ?? options.keyImageCount,
+      options.keyImageCount ? Number(options.keyImageCount) : modeConfig.chatgptImageCount,
+      "chatgptImageCount"
+    ),
     totalShots
   );
   return {

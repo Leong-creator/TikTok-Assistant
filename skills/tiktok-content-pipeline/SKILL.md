@@ -17,22 +17,26 @@ Use this skill when the user provides a TikTok Shop script and wants Codex to pr
    ```
 4. For the formal image MVP, use ChatGPT web `image-2` for planned key shots and Dreamina CLI for remaining stills. Do not fall back to API or browser Dreamina.
 5. Use Dreamina `model_version=4.0` for free image tests and keep Dreamina provider prompts Chinese-only.
-6. Choose `--total-shots`, `--video-shots`, and `--chatgpt-image-count` per script. Do not reuse qdhoaudq's 80/24/30 counts as global defaults.
-7. Reuse one ChatGPT conversation per script, use batch size 3 first, review images in the page before download, only grow to 5/10 after stable outputs, and move accepted browser downloads into the package folder.
-8. Use Dreamina CLI sessions and bounded concurrency:
+6. Long scripts must use staged production: run `calibration` first, then `pilot`, then a script-specific `full` run only after review passes.
+7. Choose `--total-shots`, `--video-shots`, and `--chatgpt-image-count` per script. Do not reuse qdhoaudq's 80/24/30 counts as global defaults.
+8. Default stage sizes are `calibration` = 8 shots / 3 video first frames / 4 ChatGPT key images, and `pilot` = 20 shots / 8 video first frames / 8 ChatGPT key images.
+9. Route complex relationship, abstract business logic, hook, and conversion shots to ChatGPT web; route simple object, hotel, office, car, cash, contract, and single-person scenes to Dreamina.
+10. Before Dreamina generation, use GPT planning to compile raw script meaning into concise Chinese visual prompts. Dreamina should receive visual staging, not raw transcript logic.
+11. Reuse one ChatGPT conversation per script, use batch size 3 first, review images in the page before download, only grow to 5/10 after stable outputs, and move accepted browser downloads into the package folder.
+12. Use Dreamina CLI sessions and bounded concurrency:
    ```bash
    node src/cli.mjs --script fixtures/top01-reference-script.txt --slug top01-reference-dreamina --mode test --provider dreamina-image --image-only --dreamina-session top01-reference --dreamina-concurrency 2
    ```
-9. For dual-layer scripts, set both `--story-category` and `--product-category`; for example a money story selling a raise-children product must keep business visuals until the final conversion section.
-10. Generate no videos in this phase; video storyboard shots become first-frame images.
-11. Review hook strength, not just semantic match. Money/business openings should create scroll-stopping impact with cash, cash rain, status contrast, stunned reactions, luxury symbols, or visible stakes. If the reference material's lure is stronger than the generated image, retry even when the image matches the sentence.
-12. Reject provider-created bottom blank bands. Do not ask for caption space; subtitles are added over the frame in CapCut.
-13. Review the contact sheet and write visual issues into `07_review_log/needs_manual_review.json`.
-14. Retry only failed shots instead of rerunning the whole package:
+13. For dual-layer scripts, set both `--story-category` and `--product-category`; for example a money story selling a raise-children product must keep business visuals until the final conversion section.
+14. Generate no videos in this phase; video storyboard shots become first-frame images.
+15. Review hook strength, not just semantic match. Money/business openings should create scroll-stopping impact with cash, cash rain, status contrast, stunned reactions, luxury symbols, or visible stakes. If the reference material's lure is stronger than the generated image, retry even when the image matches the sentence.
+16. Reject provider-created bottom blank bands. Do not ask for caption space; subtitles are added over the frame in CapCut.
+17. Review the contact sheet and write visual issues into `07_review_log/needs_manual_review.json`.
+18. Retry only failed shots instead of rerunning the whole package:
    ```bash
    node src/cli.mjs --retry-package outputs/<date>-<slug> --shots S015,S016 --provider dreamina-image
    ```
-15. Import assets into CapCut manually using `06_editing_package/editing_manifest.csv`.
+19. Import assets into CapCut manually using `06_editing_package/editing_manifest.csv`.
 
 ## Provider Safety
 
