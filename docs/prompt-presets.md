@@ -47,6 +47,8 @@ Each prompt must preserve:
 
 Use this contract for ChatGPT web image generation. It is different from Dreamina prompts because ChatGPT is also a conversational model; if the request looks like a planning task, it may answer with text instead of generating images.
 
+Before sending any prompt built from this contract, explicitly select ChatGPT's image-generation tool in the Codex Chrome plugin session. Plain chat mode is not acceptable for this provider.
+
 ### Single Image Template
 
 ```text

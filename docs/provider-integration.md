@@ -24,6 +24,7 @@ Key-image adapter:
 Prompt contract:
 
 - Begin with a direct image command: `Create one image now.` or `Create N separate images now, one image per item below.`
+- Before sending the prompt, explicitly select the ChatGPT image-generation tool in the Codex Chrome plugin session. Do not rely on plain chat mode to infer image generation.
 - Put aspect/output rules before creative content: one standalone `9:16` vertical full-frame image; no collage, storyboard page, split-screen, panel grid, picture-in-picture, or sequence.
 - Use structured fields: style, subject type, shot intent, camera/composition, characters, action/relationship, micro-expression, background, lighting/dynamics, negative constraints.
 - Keep shot IDs, review rules, provider notes, and download instructions outside the creative prompt body. They belong in Codex manifests and logs.

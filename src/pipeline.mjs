@@ -1242,6 +1242,7 @@ async function generateChatGptWebImage2Asset({ packageDir, prompt, attempt, fold
     model: "image-2",
     packageSlug: config.slug,
     conversationReuse: "one conversation per script",
+    requiredBrowserStep: "explicitly select the ChatGPT image-generation tool before sending any image prompt",
     maxTemporaryTabs: 1,
     batchPolicy: {
       initial: 3,
@@ -1257,6 +1258,7 @@ async function generateChatGptWebImage2Asset({ packageDir, prompt, attempt, fold
     shotId: prompt.shotId,
     attempt,
     outputFolder: folder,
+    requiredBrowserStep: "select ChatGPT image-generation tool first, then send prompt",
     prompt: prompt.imagePrompt,
     generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
   });

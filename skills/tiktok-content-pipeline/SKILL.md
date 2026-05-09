@@ -47,9 +47,11 @@ Use this skill when the user provides a TikTok Shop script and wants Codex to pr
 - Keep task IDs, prompts, and review results in the output folder.
 - Keep `outputs/.index.json` and each package's `07_review_log/pipeline_checkpoints.jsonl` updated.
 - Do not leave ChatGPT downloads in the system Downloads folder after collection.
+- Before clicking ChatGPT download, use the existing `download-collector` recursive snapshot function for the whole Downloads tree. The collector scans subfolders too, so a manually built top-level snapshot can move an unrelated old image.
 - Browser tasks must use only the Codex Chrome plugin. Do not substitute system Chrome automation, in-app browser, standalone Playwright, or a custom browser tool.
 - ChatGPT image downloads should use Chrome plugin download/media APIs plus the existing `download-collector`; coordinate-click flows are last resort only after logging why semantic download controls failed.
 - ChatGPT generated images should be visually reviewed in the web conversation before download. Reject and retry style-mismatched images in the same conversation instead of collecting them.
+- Before sending a ChatGPT image prompt, explicitly select the ChatGPT image-generation tool through the Codex Chrome plugin. Plain chat mode must be treated as the wrong mode for this provider even if the prompt says "create image".
 - ChatGPT web prompt format must be provider-specific. Start with an explicit "Create one image" or "Create N separate images" command, then use structured fields: style, output/aspect, subject type, shot intent, camera/composition, character setup, action/relationship, micro-expression, background, lighting/dynamics, and negative constraints. Do not paste long workflow instructions, review requirements, or full script context into the generation prompt.
 - If ChatGPT replies with analysis, rewrites the prompt, or merges several shots into one panel/grid page, record the batch as failed. Retry with a shorter single-image prompt or explicitly select the web image tool through the Codex Chrome plugin before continuing.
 - Rejections must become reusable learning: record the failure reason, update prompt presets or review heuristics when the issue is systematic, and reuse those lessons in future scripts.
