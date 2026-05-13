@@ -21,13 +21,13 @@ Complete the MVP without stopping at documentation only: a script must become a 
 ## Providers
 
 - `mock` provider is the default for tests and local package-shape validation.
-- ChatGPT web image generation is for key images when the Chrome plugin/browser login is available.
+- ChatGPT web image generation is for key images when the headed persistent browser session is available.
 - Dreamina is for batch images and image-to-video after `dreamina login` is complete.
 - Paid generation must not run without explicit confirmation.
 - For TikTok monitor/background collection, use the repository's `playwright-persistent` collector as the default browser path.
 - That collector must follow the OpenClaw browser pattern from `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace`: source-profile clone -> automation-owned profile -> `chromium.launchPersistentContext(..., { channel: "chrome" })` -> dedicated page workflow -> close only the automation-owned context.
-- For ChatGPT web image generation, review, and download in the content pipeline, keep using the Codex Chrome plugin.
-- Do not introduce a third browser path unless both `playwright-persistent` and the Codex Chrome plugin have been proven unsuitable for the task and the failure has been recorded.
+- For ChatGPT web image generation, review, and download in the content pipeline, use a headed `playwright-persistent` run profile that clones from the same shared source profile as TikTok monitoring.
+- Do not introduce a third browser path unless both the persistent browser path and the explicit fallback path have been proven unsuitable for the task and the failure has been recorded.
 
 ## Prompt Review Loop
 
@@ -55,11 +55,13 @@ outputs/<date>-<slug>/
   07_review_log/
 ```
 
-## Chrome Plugin Runtime
+## Browser Runtime
 
-- Default browser policy across this repository: use `playwright-persistent` for TikTok monitoring and background collection; use the Codex Chrome plugin for interactive ChatGPT/provider browser tasks.
+- Default browser policy across this repository: use `playwright-persistent` for both TikTok monitoring/background collection and ChatGPT/provider browser tasks.
 - Treat `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace` as the reference implementation for persistent browser bootstrap, profile seeding, login reuse, and recovery behavior.
-- Do not add direct token scraping, cookie extraction, or localStorage reads to the TikTok monitor pipeline.
+- Use one shared source profile and separate automation-owned run profiles: TikTok monitor stays headless; ChatGPT stays headed; both may run at the same time.
+- Do not add direct token scraping, cookie extraction, or localStorage reads to the TikTok monitor pipeline or the ChatGPT content pipeline.
+- The Codex Chrome plugin is no longer the default browser path for this repository. Use it only when the user explicitly asks for it or when persistent browser recovery has been exhausted and the exception is logged.
 - When the task specifically uses the Codex Chrome plugin, follow the Chrome runtime rules below.
 - For Chrome plugin control, use the Node REPL JavaScript execution tool. In Codex Desktop this is usually exposed as `mcp__node_repl__.js`; older logs or docs may show the flattened `mcp__node_repl__js` name.
 - Before bootstrapping the Chrome plugin runtime, temporarily set request metadata on the current Node REPL request prototype:
