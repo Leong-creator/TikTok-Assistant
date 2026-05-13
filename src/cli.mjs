@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { generateAssetPackage, retryPackageShots } from "./pipeline.mjs";
+import {
+  openChatGptPersistentBrowser,
+  readChatGptPersistentBrowserStatus
+} from "./chatgpt-persistent-browser.mjs";
 
-const args = parseArgs(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = parseArgs(argv);
+const command = argv[0] && !argv[0].startsWith("--") ? argv[0] : "";
 
 if (args["retry-package"]) {
   const result = await retryPackageShots({
@@ -24,10 +31,23 @@ if (args["retry-package"]) {
   process.exit(0);
 }
 
+if (command === "chatgpt-browser-open") {
+  const result = await openChatGptPersistentBrowser();
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(0);
+}
+
+if (command === "chatgpt-browser-status") {
+  const result = await readChatGptPersistentBrowserStatus();
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(0);
+}
+
 if (!args.script) {
   console.error(
     "Usage: node src/cli.mjs --script <file> [--slug name] [--mode calibration|pilot|test|standard|full] [--provider mock|dreamina-image|chatgpt-web-image2|image-mvp] [--image-only]\n" +
-      "Retry: node src/cli.mjs --retry-package <folder> --shots S015,S016 [--provider dreamina-image]"
+      "Retry: node src/cli.mjs --retry-package <folder> --shots S015,S016 [--provider dreamina-image]\n" +
+      "Browser: node src/cli.mjs chatgpt-browser-open | chatgpt-browser-status"
   );
   process.exit(2);
 }
@@ -78,6 +98,11 @@ function parseArgs(argv) {
     }
   }
   return parsed;
+}
+
+export function isCliEntryPoint(metaUrl = import.meta.url, processArgv = process.argv) {
+  const entryPath = processArgv[1] ? path.resolve(processArgv[1]) : "";
+  return entryPath ? fileURLToPath(metaUrl) === entryPath : false;
 }
 
 function parseShotList(value) {

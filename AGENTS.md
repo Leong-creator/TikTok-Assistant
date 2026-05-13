@@ -21,19 +21,19 @@ Complete the MVP without stopping at documentation only: a script must become a 
 ## Reuse First
 
 - Before adding scripts, browser workarounds, or provider glue, check and reuse the most mature existing capability available in this order: existing project modules, official CLIs, enabled Codex plugins, installed skills, and documented provider APIs.
-- Do not rebuild features already covered by `dreamina` CLI, `lark-cli`, the Codex Chrome plugin, `download-collector`, provider queues, retry commands, manifest writers, or package index writers.
+- Do not rebuild features already covered by `dreamina` CLI, `lark-cli`, `playwright-persistent` runtimes, `download-collector`, provider queues, retry commands, manifest writers, or package index writers.
 - For TikTok monitor/background collection, use the repository's `playwright-persistent` collector as the default browser path.
 - That collector must follow the OpenClaw browser pattern from `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace`: source-profile clone -> automation-owned profile -> `chromium.launchPersistentContext(..., { channel: "chrome" })` -> dedicated page workflow -> close only the automation-owned context.
-- For ChatGPT web image generation, review, and download in the content pipeline, keep using the Codex Chrome plugin.
-- Do not introduce a third browser path unless both `playwright-persistent` and the Codex Chrome plugin have been proven unsuitable for the task and the failure has been recorded.
-- For ChatGPT image downloads, prefer Chrome plugin download/media APIs and then the existing download collector. Do not use coordinate-click download flows unless the plugin exposes no usable semantic/download control and the blocker is logged.
+- For ChatGPT web image generation, review, and download in the content pipeline, use a headed `playwright-persistent` run profile that clones from the same shared source profile as TikTok monitoring.
+- Do not introduce a third browser path unless both the persistent browser path and the explicit fallback path have been proven unsuitable for the task and the failure has been recorded.
+- For ChatGPT image downloads, prefer the headed persistent browser session and then the existing download collector. Do not use coordinate-click download flows unless the direct visible download path is unavailable and the blocker is logged.
 - Review ChatGPT web images in the page before downloading. Download only accepted images; retry visibly mismatched images in the same script conversation first.
 - If an existing capability fails, diagnose and record the exact failure before changing approach. A fallback must preserve the same provider boundary and must not silently switch tools.
 
 ## Providers
 
 - `mock` provider is the default for tests and local package-shape validation.
-- ChatGPT web image generation is for key images when the Chrome plugin/browser login is available.
+- ChatGPT web image generation is for key images when the headed persistent browser session is available.
 - Dreamina is for batch images and image-to-video after `dreamina login` is complete.
 - Paid generation must not run without explicit confirmation.
 
@@ -50,8 +50,8 @@ Complete the MVP without stopping at documentation only: a script must become a 
 
 - Every shot must have a saved image prompt and video prompt before generation.
 - ChatGPT web image prompts must use the fixed image-generation contract: start with an explicit create/draw command, state one output unit, then provide structured fields for style, subject type, shot intent, composition/camera, character setup, action/relationship, micro-expression, background, lighting/dynamics, and negative constraints. Do not mix workflow instructions, review policy, or long script context into the image prompt sent to ChatGPT.
-- Before sending any ChatGPT web image prompt, explicitly select the ChatGPT image-generation tool in the Codex Chrome plugin session. Do not rely on plain chat mode to infer image generation from the prompt text.
-- ChatGPT batch generation may only batch prompts that already work as single-image prompts. Start with one image; if accepted, batch 2-3. Only grow to 5/10 after the page returns separate image outputs, not a storyboard page. If ChatGPT combines shots into a grid/panel page or answers with analysis, treat the prompt format as failed and return to single-image prompts or explicitly select the image tool in the Chrome plugin.
+- Before sending any ChatGPT web image prompt, explicitly select the ChatGPT image-generation tool in the headed persistent ChatGPT session. Do not rely on plain chat mode to infer image generation from the prompt text.
+- ChatGPT batch generation may only batch prompts that already work as single-image prompts. Start with one image; if accepted, batch 2-3. Only grow to 5/10 after the page returns separate image outputs, not a storyboard page. If ChatGPT combines shots into a grid/panel page or answers with analysis, treat the prompt format as failed and return to single-image prompts or explicitly reselect the image tool in the persistent session.
 - For ChatGPT, shot labels such as `S004` may appear in the surrounding message text or manifest, but the image prompt itself must say that labels/text must not be drawn. Prefer "Image 1 / Image 2" for batch grouping rather than repeated shot IDs inside the creative body.
 - Every generated asset must be reviewed against: shot intent, preset style, vertical format, subject clarity, full-frame composition, and scene logic.
 - Review must also score TikTok hook strength: visual shock, conflict, curiosity gap, money/status contrast, emotional tension, and whether the image can stop scrolling in the first second.
@@ -86,11 +86,13 @@ outputs/<date>-<slug>/
   07_review_log/
 ```
 
-## Chrome Plugin Runtime
+## Browser Runtime
 
-- Default browser policy across this repository: use `playwright-persistent` for TikTok monitoring and background collection; use the Codex Chrome plugin for interactive ChatGPT/provider browser tasks.
+- Default browser policy across this repository: use `playwright-persistent` for both TikTok monitoring/background collection and ChatGPT/provider browser tasks.
 - Treat `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace` as the reference implementation for persistent browser bootstrap, profile seeding, login reuse, and recovery behavior.
-- Do not add direct token scraping, cookie extraction, or localStorage reads to the TikTok monitor pipeline.
+- Use one shared source profile and separate automation-owned run profiles: TikTok monitor stays headless; ChatGPT stays headed; both may run at the same time.
+- Do not add direct token scraping, cookie extraction, or localStorage reads to the TikTok monitor pipeline or the ChatGPT content pipeline.
+- The Codex Chrome plugin is no longer the default browser path for this repository. Use it only when the user explicitly asks for it or when persistent browser recovery has been exhausted and the exception is logged.
 - When the task specifically uses the Codex Chrome plugin, follow the Chrome runtime rules below.
 - For Chrome plugin control, use the Node REPL JavaScript execution tool. In Codex Desktop this is usually exposed as `mcp__node_repl__.js`; older logs or docs may show the flattened `mcp__node_repl__js` name.
 - Before bootstrapping the Chrome plugin runtime, temporarily set request metadata on the current Node REPL request prototype:

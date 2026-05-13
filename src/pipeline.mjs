@@ -9,6 +9,7 @@ import {
   nextDreaminaConcurrency,
   runDreaminaQueue
 } from "./dreamina-provider.mjs";
+import { browserSupervisionPolicySummary } from "./browser-supervision-policy.mjs";
 import { upsertPackageIndex } from "./package-index.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -23,11 +24,11 @@ export const PIPELINE_PHASES = [
 ];
 
 const MODES = {
-  calibration: { totalShots: 8, videoShots: 3, chatgptImageCount: 4 },
-  pilot: { totalShots: 20, videoShots: 8, chatgptImageCount: 8 },
-  test: { totalShots: 20, videoShots: 5, chatgptImageCount: 3 },
-  standard: { totalShots: 40, videoShots: 12, chatgptImageCount: 12 },
-  full: { totalShots: 80, videoShots: 24, chatgptImageCount: 24 }
+  calibration: { totalShots: 12, videoShots: 8, chatgptImageCount: 12 },
+  pilot: { totalShots: 28, videoShots: 12, chatgptImageCount: 20 },
+  test: { totalShots: 20, videoShots: 8, chatgptImageCount: 20 },
+  standard: { totalShots: 40, videoShots: 14, chatgptImageCount: 32 },
+  full: { totalShots: 80, videoShots: 24, chatgptImageCount: 48 }
 };
 
 const PRESETS = {
@@ -191,6 +192,7 @@ export async function generateAssetPackage(options) {
       imageShots: shots.filter((shot) => shot.assetType === "image").length,
       chatgptImageShots: routeSummary.chatgptImageShots,
       dreaminaImageShots: routeSummary.dreaminaImageShots,
+      dreaminaVideoShots: prompts.filter((prompt) => prompt.assetType === "video").length,
       manualReview: generation.needsManualReview.length
     }
   };
@@ -268,6 +270,7 @@ export async function retryPackageShots(options) {
       originalPrompt: prompt.imagePrompt,
       generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
       videoPrompt: prompt.videoPrompt,
+      dreaminaVideoPrompt: prompt.dreaminaVideoPrompt,
       issue: review.issue,
       promptChange: review.promptChange,
       status: review.status,
@@ -300,6 +303,11 @@ export async function retryPackageShots(options) {
       captionText: prompt.line,
       suggestedEdit: buildSuggestedEdit({ ...asset, prompt, storyboardAssetType: prompt.assetType }),
       promptPreset: prompt.presetId,
+      segmentName: prompt.segmentName,
+      operatorSectionName: prompt.operatorSectionName,
+      imageRole: prompt.imageRole,
+      chatgptBatchPolicy: prompt.chatgptBatchPolicy,
+      dreaminaVideoPrompt: prompt.dreaminaVideoPrompt,
       attempts: attempt
     };
     const manifestIndex = manifest.shots.findIndex((shot) => shot.shotId === shotId);
@@ -319,7 +327,8 @@ export async function retryPackageShots(options) {
       attempts: entry.attempt,
       reason: `${entry.issue}; manual review required after targeted retry`,
       prompt: entry.originalPrompt,
-      generationPrompt: entry.generationPrompt
+      generationPrompt: entry.generationPrompt,
+      dreaminaVideoPrompt: entry.dreaminaVideoPrompt
     });
   }
 
@@ -615,14 +624,13 @@ function buildStoryboard(script, totalShots, videoShots, taxonomy) {
   );
   const usableLines = scriptLines.length ? scriptLines : ["A compelling TikTok product story unfolds."];
   const shots = [];
-  const conversionShots = Math.min(totalShots, Math.max(4, Math.round(totalShots * 0.1)));
+  const segmentPlan = buildSegmentPlan(totalShots, videoShots, taxonomy);
 
   for (let index = 0; index < totalShots; index += 1) {
     const shotNumber = index + 1;
     const id = `S${String(shotNumber).padStart(3, "0")}`;
     const sentence = usableLines[index % usableLines.length];
-    const assetType = shotNumber <= videoShots ? "video" : "image";
-    const section = shotNumber <= videoShots ? "hook_video" : shotNumber > totalShots - conversionShots ? "conversion" : "story_image";
+    const segment = segmentForOrder(shotNumber, segmentPlan);
     shots.push({
       id,
       order: shotNumber,
@@ -630,16 +638,80 @@ function buildStoryboard(script, totalShots, videoShots, taxonomy) {
       storyCategory: taxonomy.storyCategory,
       productCategory: taxonomy.productCategory,
       conversionAngle: taxonomy.conversionAngle,
-      section,
-      assetType,
-      durationSeconds: assetType === "video" ? 5 : 3,
+      section: segment.section,
+      segmentName: segment.name,
+      operatorSectionName: segment.operatorName,
+      assetType: segment.assetType,
+      imageRole: segment.imageRole,
+      durationSeconds: segment.assetType === "video" ? 5 : 3,
       line: sentence,
       subjectTag: chooseSubjectTag(sentence),
-      visualBeat: buildVisualBeat(sentence, section, taxonomy)
+      visualBeat: buildVisualBeat(sentence, segment.section, taxonomy)
     });
   }
 
   return shots;
+}
+
+function buildSegmentPlan(totalShots, videoShots, taxonomy) {
+  const frontTarget = clampCount(Math.round(totalShots * 0.15), 6, 12);
+  const frontVideoShots = Math.min(totalShots, videoShots, frontTarget);
+  const remainingAfterFront = Math.max(0, totalShots - frontVideoShots);
+  const backVideoShots = Math.min(Math.max(0, videoShots - frontVideoShots), remainingAfterFront);
+  const desiredBookBroll = taxonomy.productCategory === "raise_children" ? 4 : 2;
+  const bookBrollShots = Math.min(desiredBookBroll, Math.max(0, totalShots - frontVideoShots - backVideoShots));
+  const backSegmentShots = backVideoShots + bookBrollShots;
+  const backStartOrder = backSegmentShots > 0 ? totalShots - backSegmentShots + 1 : totalShots + 1;
+  const bookBrollStartOrder = bookBrollShots > 0 ? totalShots - bookBrollShots + 1 : totalShots + 1;
+  return {
+    totalShots,
+    frontVideoShots,
+    backVideoShots,
+    bookBrollShots,
+    backStartOrder,
+    bookBrollStartOrder
+  };
+}
+
+function clampCount(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function segmentForOrder(order, plan) {
+  if (order <= plan.frontVideoShots) {
+    return {
+      section: "hook_video",
+      name: "front_video",
+      operatorName: "首段钩子视频",
+      assetType: "video",
+      imageRole: "dreamina_video_first_frame"
+    };
+  }
+  if (order >= plan.bookBrollStartOrder) {
+    return {
+      section: "book_broll",
+      name: "book_broll",
+      operatorName: "图书空镜",
+      assetType: "image",
+      imageRole: "book_or_product_broll"
+    };
+  }
+  if (order >= plan.backStartOrder) {
+    return {
+      section: "conversion_video",
+      name: "back_video",
+      operatorName: "后段转化视频",
+      assetType: "video",
+      imageRole: "dreamina_video_first_frame"
+    };
+  }
+  return {
+    section: "story_image",
+    name: "middle_image",
+    operatorName: "中段叙事图片",
+    assetType: "image",
+    imageRole: "story_image"
+  };
 }
 
 function chooseSubjectTag(sentence) {
@@ -655,11 +727,17 @@ function buildVisualBeat(sentence, section, taxonomy) {
     }
     return `Open with visible conflict: adult characters react strongly to the idea "${sentence}".`;
   }
-  if (section === "conversion") {
+  if (section === "conversion_video") {
     if (taxonomy.productCategory === "raise_children") {
-      return `Convert the money story into a parent and children financial literacy scene about real-world judgment, relationships, and practical decision making: "${sentence}".`;
+      return `Turn the story lesson into a final short video beat about parents teaching children real-world judgment, relationship rules, and practical money sense: "${sentence}".`;
     }
-    return `Connect the lesson to a book or product moment while preserving the story context: "${sentence}".`;
+    return `Turn the lesson into a short conversion video beat while preserving the story context: "${sentence}".`;
+  }
+  if (section === "book_broll") {
+    if (taxonomy.productCategory === "raise_children") {
+      return `Show a clean book/product b-roll moment that supports the parenting and financial-literacy offer without readable cover text: "${sentence}".`;
+    }
+    return `Show a clean book or product b-roll moment while preserving the story context: "${sentence}".`;
   }
   if (taxonomy.storyCategory === "raise_children") {
     return `Show a parent, child, classroom or home-learning moment that makes the line understandable without audio: "${sentence}".`;
@@ -711,19 +789,20 @@ function buildPromptForShot(shot, taxonomy) {
     `镜头感觉：${translateCameraForDreamina(camera)}。`,
     `${buildDreaminaCompositionLine(shot, taxonomy)}`
   ].join(" ");
-  const videoPrompt = [
-    "Animate this image as a short TikTok story beat.",
-    "Use smooth camera movement, subtle character motion, natural lighting change, and no added text.",
-    `Preserve the image style and story intent: ${shot.visualBeat}`
-  ].join(" ");
+  const videoPrompt = buildGenericVideoPrompt(shot);
+  const dreaminaVideoPrompt = shot.assetType === "video" ? buildDreaminaImageToVideoPrompt(shot, taxonomy) : "";
 
   return {
     shotId: shot.id,
     order: shot.order,
     section: shot.section,
+    segmentName: shot.segmentName,
+    operatorSectionName: shot.operatorSectionName,
     presetId,
     presetLabel: preset.label,
     assetType: shot.assetType,
+    imageRole: shot.imageRole,
+    chatgptBatchPolicy: buildChatGptBatchPolicy(shot),
     storyCategory: taxonomy.storyCategory,
     productCategory: taxonomy.productCategory,
     conversionAngle: taxonomy.conversionAngle,
@@ -731,15 +810,21 @@ function buildPromptForShot(shot, taxonomy) {
     visualBeat: shot.visualBeat,
     imagePrompt,
     generationPrompt,
-    videoPrompt
+    videoPrompt,
+    dreaminaVideoPrompt
   };
 }
 
 function buildChatGptImagePrompt({ shot, taxonomy, preset, camera }) {
   const characters = buildChatGptCharacterLine(shot, taxonomy);
+  const videoFirstFrameLine =
+    shot.assetType === "video"
+      ? "This image is a first frame for image-to-video generation: choose a pose, spatial direction, facial tension, and environment that can naturally animate in the next 3-5 seconds."
+      : "This image is a standalone story frame for manual CapCut motion.";
   return [
     "Create one image now.",
     "Output: one standalone 9:16 vertical full-frame image. Do not create a collage, storyboard page, split screen, panel grid, picture-in-picture, or sequence.",
+    videoFirstFrameLine,
     `Style: ${BASE_VISUAL_STYLE}. ${preset.style}. Premium TikTok story-ad illustration, cinematic warm light, realistic adult proportions, high-detail 4K look, clean stable composition.`,
     `Subject type: ${shot.subjectTag}.`,
     `Shot intent: ${shot.visualBeat}`,
@@ -754,7 +839,7 @@ function buildChatGptImagePrompt({ shot, taxonomy, preset, camera }) {
 }
 
 function buildChatGptCharacterLine(shot, taxonomy) {
-  if (shot.section === "conversion" && taxonomy.productCategory === "raise_children") {
+  if (isConversionLikeSection(shot.section) && taxonomy.productCategory === "raise_children") {
     return "American parent, child, or mentor figures with realistic adult and child proportions; keep product/education visuals only in the conversion section.";
   }
   if (taxonomy.storyCategory === "make_money" || taxonomy.storyCategory === "business") {
@@ -767,7 +852,7 @@ function buildChatGptCharacterLine(shot, taxonomy) {
 }
 
 function buildChatGptBackgroundLine(shot, taxonomy) {
-  if (shot.section === "conversion" && taxonomy.productCategory === "raise_children") {
+  if (isConversionLikeSection(shot.section) && taxonomy.productCategory === "raise_children") {
     return "warm American family learning space, table, papers or book-like objects without readable text, practical financial-literacy mood.";
   }
   if (taxonomy.storyCategory === "make_money" || taxonomy.storyCategory === "business") {
@@ -780,13 +865,13 @@ function buildChatGptBackgroundLine(shot, taxonomy) {
 }
 
 function choosePresetForShot(shot, taxonomy) {
-  if (shot.section === "conversion" && taxonomy.productCategory === "raise_children") return "parenting-book";
+  if (isConversionLikeSection(shot.section) && taxonomy.productCategory === "raise_children") return "parenting-book";
   if (taxonomy.storyPreset) return taxonomy.storyPreset;
   return CATEGORY_PRESETS[taxonomy.storyCategory] ?? CATEGORY_PRESETS.default;
 }
 
 function buildDreaminaStyleLine(shot, taxonomy) {
-  if (shot.section === "conversion" && taxonomy.productCategory === "raise_children") {
+  if (isConversionLikeSection(shot.section) && taxonomy.productCategory === "raise_children") {
     return "亲子财商教育主题，父母与孩子在温暖室内学习现实判断、人情关系和金钱规则，场面克制但有启发感，画面铺满，人物和环境自然延伸到上下边缘。";
   }
   if (taxonomy.storyCategory === "make_money" || taxonomy.storyCategory === "business") {
@@ -800,7 +885,7 @@ function buildDreaminaStyleLine(shot, taxonomy) {
 
 function buildDreaminaCompositionLine(shot, taxonomy) {
   const environment =
-    shot.section === "conversion" && taxonomy.productCategory === "raise_children"
+    isConversionLikeSection(shot.section) && taxonomy.productCategory === "raise_children"
       ? "环境要像温暖的美国家庭学习空间"
       : taxonomy.storyCategory === "make_money" || taxonomy.storyCategory === "business"
         ? "环境要像美国高端酒店、房产办公室、豪车展厅或富人书房"
@@ -811,7 +896,10 @@ function buildDreaminaCompositionLine(shot, taxonomy) {
 }
 
 function translateVisualBeatForDreamina(shot) {
-  if (shot.section === "conversion" && shot.productCategory === "raise_children") {
+  if (shot.section === "book_broll" && shot.productCategory === "raise_children") {
+    return "温暖室内的图书空镜，桌上有翻开的空白书页、书签、铅笔和孩子做现实问题练习的纸张，书页不要出现可读文字，画面表达亲子财商教育和现实判断";
+  }
+  if (shot.section === "conversion_video" && shot.productCategory === "raise_children") {
     return "父母把赚钱故事里的规则讲给孩子听，孩子在旁边认真思考，桌上有翻开的空白纸页和生活物件，画面表达财商、人情世故和现实判断的教育承接";
   }
   const isParentingStory = shot.storyCategory === "raise_children" && shot.productCategory === "raise_children";
@@ -827,7 +915,7 @@ function translateVisualBeatForDreamina(shot) {
     }
     return `用明显的家庭冲突开场，成年人围绕家庭边界、亲戚照顾和家中压力发生克制但紧张的对峙，画面只表现情境`;
   }
-  if (shot.section === "conversion") {
+  if (isConversionLikeSection(shot.section)) {
     return `把故事教训自然连接到成年人阅读思考的场景，保留前面的家庭边界故事语境，纸质读物只露出翻开的空白页面`;
   }
   if (shot.storyCategory === "raise_children") {
@@ -837,6 +925,99 @@ function translateVisualBeatForDreamina(shot) {
     return "展示成年人社交压力、办公室肢体语言或公共互动冲突，让观众不听声音也能理解人物关系的紧张感";
   }
   return describeBusinessLineForDreamina(shot.line);
+}
+
+function isConversionLikeSection(section) {
+  return section === "conversion_video" || section === "book_broll";
+}
+
+function buildGenericVideoPrompt(shot) {
+  return [
+    "Animate this approved first-frame image as one short TikTok story beat.",
+    "Keep the same characters, face identity, wardrobe, environment, and style.",
+    "Use one continuous shot with smooth camera movement, subtle character motion, natural lighting change, and no added text.",
+    `Story intent: ${shot.visualBeat}`,
+    "End with a stable frame that can cut cleanly to the next shot."
+  ].join(" ");
+}
+
+function buildDreaminaImageToVideoPrompt(shot, taxonomy) {
+  const movement = shot.section === "hook_video" ? buildDreaminaHookVideoAction(shot, taxonomy) : buildDreaminaConversionVideoAction(shot, taxonomy);
+  return [
+    "根据上传的首帧图生成一个竖版短视频片段，保持首帧人物长相、服装、场景、画风和光线一致。",
+    `脚本意图：${translateVisualBeatForDreamina(shot)}。`,
+    `首帧承接：从当前构图自然开始，不要换场景，不要新增无关人物。`,
+    `人物动作变化：${movement.action}。`,
+    `镜头运动：${movement.camera}。`,
+    `情绪变化：${movement.emotion}。`,
+    `场景动态：${movement.environment}。`,
+    "节奏和时长：3-5 秒，前 1 秒抓住注意力，中间推进动作，最后 0.5 秒稳定收住方便剪辑。",
+    `结尾状态：${movement.ending}。`,
+    "负面约束：不要变脸，不要换衣服，不要跳场，不要多镜头拼接，不要文字，不要字幕，不要 logo，不要水印，不要夸张畸变，不要新增第二个版本的人物。"
+  ].join(" ");
+}
+
+function buildDreaminaHookVideoAction(shot, taxonomy) {
+  if (taxonomy.storyCategory === "make_money" || taxonomy.storyCategory === "business") {
+    return {
+      action: "主角向画面深处或前景移动，周围人产生震惊反应，现金、合同、账单或豪车元素轻微运动，金钱冲击要比静态图更明显",
+      camera: "缓慢推进并带轻微视差，让主角、现金/豪车/合同和围观者形成前中后景层次",
+      emotion: "主角从克制自信到更坚定，旁观者从疑惑到震惊，形成强烈钩子",
+      environment: "灯光和背景细节轻微变化，现金或纸张自然飘动，但不要遮住人物脸",
+      ending: "停在主角与金钱/身份反差最清楚的一帧"
+    };
+  }
+  return {
+    action: "人物保持同一空间内的克制冲突，手势和身体距离逐渐变化",
+    camera: "缓慢推进到表情和关系压力最清楚的位置",
+    emotion: "从压抑到紧张，表情变化明显但不过度夸张",
+    environment: "室内光线轻微变化，背景稳定不跳动",
+    ending: "停在冲突关系最清楚的一帧"
+  };
+}
+
+function buildDreaminaConversionVideoAction(shot, taxonomy) {
+  if (taxonomy.productCategory === "raise_children") {
+    return {
+      action: "父母或导师轻轻翻开空白书页或把生活问题纸张推给孩子，孩子从困惑转为认真思考",
+      camera: "从书页和手部轻微推进到父母与孩子的表情，保持温暖可信",
+      emotion: "成年人平静坚定，孩子逐渐理解，形成教育转化感",
+      environment: "书页、铅笔、桌面和暖光轻微运动，不能出现可读文字",
+      ending: "停在孩子认真思考、书页和家庭学习氛围都清楚的一帧"
+    };
+  }
+  return {
+    action: "主角把故事中的规则自然连接到产品或书本场景，动作克制可信",
+    camera: "缓慢推进到产品/书本和人物表情都清楚的位置",
+    emotion: "从思考到确认，避免硬广式夸张表演",
+    environment: "关键物件轻微移动，光线稳定",
+    ending: "停在产品承接和故事价值都清楚的一帧"
+  };
+}
+
+function buildChatGptBatchPolicy(shot) {
+  if (shot.section === "hook_video") {
+    return {
+      stage: "首段钩子首帧",
+      recommendedBatchSize: "2-4",
+      priority: "quality_first",
+      reviewFocus: ["钩子强度", "首秒停留", "图生视频可动性", "人物和场景连续性"]
+    };
+  }
+  if (shot.section === "story_image") {
+    return {
+      stage: "中段叙事图片",
+      recommendedBatchSize: "6-12",
+      priority: "batch_efficiency",
+      reviewFocus: ["故事清晰", "人物连续", "画面无文字", "可做慢速推进"]
+    };
+  }
+  return {
+    stage: "后段转化和图书空镜",
+    recommendedBatchSize: "3-6",
+    priority: "conversion_trust",
+    reviewFocus: ["转化可信", "图书空镜无可读文字", "图生视频可动性", "产品感不过硬"]
+  };
 }
 
 function describeBusinessLineForDreamina(line) {
@@ -983,6 +1164,7 @@ async function generateAndReviewPrompt({ packageDir, prompt, config, forceReject
         originalPrompt: prompt.imagePrompt,
         generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
         videoPrompt: prompt.videoPrompt,
+        dreaminaVideoPrompt: prompt.dreaminaVideoPrompt,
         issue,
         promptChange: "retry the same prompt once; if the provider keeps failing, inspect provider logs or simplify the provider prompt",
         status: "rejected",
@@ -1001,6 +1183,7 @@ async function generateAndReviewPrompt({ packageDir, prompt, config, forceReject
       originalPrompt: prompt.imagePrompt,
       generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
       videoPrompt: prompt.videoPrompt,
+      dreaminaVideoPrompt: prompt.dreaminaVideoPrompt,
       issue: review.issue,
       promptChange: review.promptChange,
       status: review.status,
@@ -1020,6 +1203,8 @@ async function generateAndReviewPrompt({ packageDir, prompt, config, forceReject
       reason: `${lastReason}; manual review required after max retries`,
       prompt: prompt.imagePrompt,
       generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
+      ,
+      dreaminaVideoPrompt: prompt.dreaminaVideoPrompt
     });
   }
   return { acceptedAssets, reviewLines, needsManualReview };
@@ -1050,10 +1235,11 @@ function mergePromptReviewResults(results) {
       needsManualReview.push({
         shotId: prompt.shotId,
         attempts: 1,
-        reason: `${issue}; manual review required after queue failure`,
-        prompt: prompt.imagePrompt,
-        generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
-      });
+      reason: `${issue}; manual review required after queue failure`,
+      prompt: prompt.imagePrompt,
+      generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
+      dreaminaVideoPrompt: prompt.dreaminaVideoPrompt
+    });
       continue;
     }
     acceptedAssets.push(...result.value.acceptedAssets);
@@ -1237,20 +1423,22 @@ async function generateChatGptWebImage2Asset({ packageDir, prompt, attempt, fold
   const taskDir = path.join(packageDir, "07_review_log", "chatgpt_web_tasks");
   await mkdir(taskDir, { recursive: true });
   const sessionPath = path.join(packageDir, "07_review_log", "chatgpt_session.json");
+  const browserSupervisionPolicy = browserSupervisionPolicySummary();
   await writeJson(sessionPath, {
     provider: "chatgpt-web-image2",
     model: "image-2",
     packageSlug: config.slug,
     conversationReuse: "one conversation per script",
-    requiredBrowserStep: "explicitly select the ChatGPT image-generation tool before sending any image prompt",
+    requiredBrowserStep: "explicitly select the ChatGPT image-generation tool in the headed persistent session before sending any image prompt",
+    browserSupervisionPolicy,
     maxTemporaryTabs: 1,
     batchPolicy: {
-      initial: 3,
-      stable: 5,
-      maximum: 10,
-      fallbackOnQualityIssue: 1
+      frontVideoFirstFrames: "2-4 per batch, quality first",
+      middleStoryImages: "6-12 per batch after prompts are stable",
+      backConversionAndBookBroll: "3-6 per batch",
+      fallbackOnQualityIssue: "retry as one image"
     },
-    status: "pending-browser-adapter"
+    status: "pending-persistent-browser-session"
   });
   await writeJson(path.join(taskDir, `${prompt.shotId}_a${attempt}.json`), {
     provider: "chatgpt-web-image2",
@@ -1258,12 +1446,16 @@ async function generateChatGptWebImage2Asset({ packageDir, prompt, attempt, fold
     shotId: prompt.shotId,
     attempt,
     outputFolder: folder,
-    requiredBrowserStep: "select ChatGPT image-generation tool first, then send prompt",
+    imageRole: prompt.imageRole,
+    chatgptBatchPolicy: prompt.chatgptBatchPolicy,
+    requiredBrowserStep: "select ChatGPT image-generation tool in the headed persistent session first, then send prompt",
+    browserSupervisionPolicy,
     prompt: prompt.imagePrompt,
-    generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt
+    generationPrompt: prompt.generationPrompt ?? prompt.imagePrompt,
+    dreaminaVideoPrompt: prompt.dreaminaVideoPrompt
   });
   throw new Error(
-    `chatgpt-web-image2 requires the Codex Chrome browser adapter to generate ${prompt.shotId}; task JSON was written for browser execution`
+    `chatgpt-web-image2 requires the headed persistent ChatGPT browser session to generate ${prompt.shotId}; task JSON was written for browser execution`
   );
 }
 
@@ -1278,11 +1470,13 @@ function reviewAsset(prompt, asset, forcedReject) {
   const hasStyle = /comic|illustration|storyboard|silhouette/i.test(prompt.imagePrompt);
   const hasRatio = /9:16 vertical/i.test(prompt.imagePrompt);
   const hasAsset = Boolean(asset.relativePath);
+  const videoFirstFrameReady =
+    prompt.assetType !== "video" || /first frame for image-to-video|first-frame image/i.test(prompt.imagePrompt);
   const hasHookStrength =
     prompt.section !== "hook_video" ||
     !/(make_money|business)/.test(String(prompt.storyCategory)) ||
     /(flying cash|cash rain|shocked|stunned|money-status|visible money shock|commission|contract|luxury|status tension|wealthy|surprised)/i.test(prompt.imagePrompt);
-  if (hasStyle && hasRatio && hasAsset && hasHookStrength) {
+  if (hasStyle && hasRatio && hasAsset && hasHookStrength && videoFirstFrameReady) {
     return { status: "accepted", issue: "", promptChange: "" };
   }
   if (!hasHookStrength) {
@@ -1294,8 +1488,10 @@ function reviewAsset(prompt, asset, forcedReject) {
   }
   return {
     status: "rejected",
-    issue: "missing required style, ratio, or asset path",
-    promptChange: "restore required style block and vertical ratio wording"
+    issue: videoFirstFrameReady ? "missing required style, ratio, or asset path" : "video first-frame prompt lacks image-to-video movement readiness",
+    promptChange: videoFirstFrameReady
+      ? "restore required style block and vertical ratio wording"
+      : "add first-frame-for-image-to-video wording, extendable pose, camera direction, and movement potential"
   };
 }
 
@@ -1312,10 +1508,15 @@ function buildEditingManifest(acceptedAssets, config, taxonomy) {
     assetPath: asset.relativePath,
     durationSeconds: asset.storyboardAssetType === "video" ? 5 : 3,
     captionText: asset.prompt.line,
-    suggestedEdit: buildSuggestedEdit(asset),
-    promptPreset: asset.prompt.presetId,
-    attempts: asset.attempts
-  }));
+      suggestedEdit: buildSuggestedEdit(asset),
+      promptPreset: asset.prompt.presetId,
+      segmentName: asset.prompt.segmentName,
+      operatorSectionName: asset.prompt.operatorSectionName,
+      imageRole: asset.prompt.imageRole,
+      chatgptBatchPolicy: asset.prompt.chatgptBatchPolicy,
+      dreaminaVideoPrompt: asset.prompt.dreaminaVideoPrompt,
+      attempts: asset.attempts
+    }));
   return {
     generatedAt: config.now.toISOString(),
     mode: config.mode,
@@ -1329,23 +1530,25 @@ function buildEditingManifest(acceptedAssets, config, taxonomy) {
     conversionAngle: taxonomy.conversionAngle,
     routingPlan: config.routingPlan ?? "dynamic",
     notes: [
-      "Audio, book close-ups, product real shots, final subtitle styling, and CTA are manual CapCut work for MVP.",
-      "Mock provider assets prove package shape only; replace with ChatGPT/Dreamina provider outputs after login."
+      "音频、书籍近景、商品实拍、最终字幕样式和 CTA 仍由剪辑师在 CapCut 中手动完成。",
+      "ChatGPT 是主要生图工具；即梦第一版重点根据审核通过的 ChatGPT 首帧图生视频。",
+      "mock 素材只用于验证本地包结构；登录并确认额度后再替换为 ChatGPT/Dreamina 输出。"
     ],
     shots
   };
 }
 
 function buildSuggestedEdit(asset) {
-  if (asset.assetType === "video") return "place as generated hook/story video";
+  if (asset.assetType === "video") return "按生成顺序放入钩子或转化视频轨道";
   if (asset.storyboardAssetType === "video") {
-    return "use as first frame for future image-to-video; for this image-only test, apply slow push-in in CapCut";
+    return "作为即梦图生视频首帧；人工复制对应 dreaminaVideoPrompt 生成视频后替换本图";
   }
-  return "apply slow zoom or slight horizontal pan in CapCut";
+  if (asset.prompt?.section === "book_broll") return "作为图书空镜或产品替换占位，后续可用实拍书籍近景替换";
+  return "在 CapCut 里做慢速缩放或轻微横移";
 }
 
 function buildManualCapCutGuide(manifest) {
-  return `# Manual CapCut Import Guide
+  return `# CapCut 手动导入指南
 
 Mode: ${manifest.mode}
 Provider: ${manifest.provider}
@@ -1353,34 +1556,34 @@ Story category: ${manifest.storyCategory ?? manifest.category}
 Product category: ${manifest.productCategory ?? manifest.category}
 Conversion angle: ${manifest.conversionAngle ?? ""}
 
-## Import order
+## 导入顺序
 
-1. Import the generated video clips from \`05_video_clips_dreamina/\`.
-2. Import key images from \`03_key_images_chatgpt/\`.
-3. Import bulk images from \`04_bulk_images_dreamina/\`.
-4. Sort by filename, then place assets according to \`editing_manifest.csv\`.
-5. For image assets, apply a slow zoom or slight pan for the listed duration.
-6. Add human-created voiceover and book/product close-up shots.
-7. Add final captions and keyword highlights manually.
+1. 先在 ChatGPT 生成并审核 \`03_key_images_chatgpt/\` 的首帧图和叙事图片。
+2. 对 \`storyboardAssetType=video\` 的镜头，把审核通过的 ChatGPT 首帧图上传到即梦图生视频，并复制对应 \`dreaminaVideoPrompt\`。
+3. 把即梦生成的视频片段放入 \`05_video_clips_dreamina/\`。
+4. 中段图片按 \`editing_manifest.csv\` 做慢速缩放或轻微横移。
+5. 后段图书空镜可先用 ChatGPT 图，最终可用真人实拍书籍近景替换。
+6. 手动加入真人配音、最终字幕、关键词高亮和 CTA。
 
-## Notes
+## 注意事项
 
-- This MVP does not write a CapCut draft.
-- This MVP does not depend on Dreamina-to-CapCut sync.
-- Replace mock assets with real provider outputs when ChatGPT/Dreamina login is available.
+- 当前 MVP 不写入 CapCut 草稿。
+- 当前 MVP 不依赖 Dreamina 到 CapCut 的账号同步。
+- 当前 MVP 不自动运行即梦图生视频；即梦任务需要人工复制 prompt 并确认额度。
+- mock 素材只验证包结构；登录并确认额度后再替换为 ChatGPT/即梦输出。
 `;
 }
 
 function buildCheckpointLog(config, taxonomy, manifest, generation) {
-  return `# Checkpoint Log
+  return `# 流程检查日志
 
-- Goal: Generate a local CapCut-ready asset folder from one TikTok script.
+- 目标：把一条 TikTok 脚本生成本地 CapCut 可手动导入素材包。
 - Mode: ${config.mode}
 - Provider: ${config.provider}
 - Story category: ${taxonomy.storyCategory}
 - Product category: ${taxonomy.productCategory}
-- Shots accepted: ${manifest.shots.length}
-- Manual review items: ${generation.needsManualReview.length}
+- 已接收镜头：${manifest.shots.length}
+- 需要人工复查：${generation.needsManualReview.length}
 - Prompt review log: 07_review_log/prompt_iterations.jsonl
 - Editing manifest: 06_editing_package/editing_manifest.csv
 `;
@@ -1431,6 +1634,8 @@ function toCsv(rows) {
     "captionText",
     "suggestedEdit",
     "promptPreset",
+    "operatorSectionName",
+    "imageRole",
     "attempts"
   ];
   return [

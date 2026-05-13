@@ -8,12 +8,15 @@ The MVP does not create a CapCut draft and does not depend on Dreamina-to-CapCut
 
 This project is reuse-first. Before adding a new workaround, use existing mature capabilities: pipeline modules, provider adapters, `download-collector`, retry commands, `dreamina` CLI, `lark-cli`, enabled Codex plugins, and installed skills.
 
-All browser work must use the Codex Chrome plugin only. ChatGPT image downloads should use plugin download/media APIs plus the existing download collector; do not switch to another browser automation path or build a duplicate downloader.
+Browser defaults now use a shared OpenClaw-style persistent Chrome family: TikTok monitoring runs in a headless automation-owned profile, while ChatGPT image generation/review/download runs in a separate headed automation-owned profile. Both clone from the same shared source profile so they can stay logged in at the same time without sharing a live run profile.
+
+Browser operations use the shared `persistent-browser-split-runtime-v1` policy: OpenClaw-style profile clone first, short DOM/media reads first, screenshots only as a fallback or handoff aid, and separate headed/headless run profiles so ChatGPT and TikTok tasks can run concurrently.
 
 For ChatGPT web images, review the generated images in the page before downloading. Download only accepted images into the package; retry mismatched shots in the same conversation.
 
-Generated assets are reviewed for TikTok hook strength as well as prompt match. Failures must produce reusable lessons in review logs or prompt presets so future scripts reuse what was learned.
-For business hooks, a calm accurate scene can still fail if the reference-level lure is stronger. Opening beats should usually push visible money shock, cash rain, status contrast, or stunned reactions before quieter explanatory scenes.
+Generated assets are reviewed for TikTok 钩子 strength as well as prompt match. Failures must produce reusable lessons in review logs or prompt presets so future scripts reuse what was learned.
+For business 钩子, a calm accurate scene can still fail if the reference-level lure is stronger. Opening beats should usually push visible money shock, cash rain, status contrast, or stunned reactions before quieter explanatory scenes.
+If ChatGPT returns multiple independent images displayed as a grid of thumbnails, review them individually as batch output. If it returns one image that contains a multi-panel grid/storyboard, treat it as preview-only and regenerate accepted cells as standalone 9:16 images before Dreamina image-to-video.
 Image prompts should not reserve blank subtitle space. Captions are added over the image in CapCut, so assets should stay full-frame and visually complete.
 
 ## Quick Start
@@ -23,6 +26,24 @@ Run tests:
 ```bash
 npm test
 ```
+
+Current operator MVP:
+
+Use the clean `TikTok素材制作助手` GPT in ChatGPT web:
+
+```text
+https://chatgpt.com/g/g-6a006f3961d48191a8c34af793cea88c-tiktoksu-cai-zhi-zuo-zhu-shou
+```
+
+Paste only the full script there, with no workflow prompt, technical instructions, or reminder text. The GPT treats a plain script paste as the formal production request, performs `首段钩子预检`, then first generates S001 as one clean standalone ChatGPT image in script order. The S001 image prompt sent to the image tool must not contain shot IDs, workflow text, or multi-shot context. After S001 passes review, later batch sizes are decided from the script and image complexity rather than fixed; if ChatGPT merges a batch into a collage or storyboard page, GPT falls back to a clean single-image retry. After operator confirmation it continues to full storyboard, remaining ChatGPT image generation, Dreamina image-to-video prompts, and prompt review. ChatGPT image generation happens inside the GPT conversation; only Dreamina image-to-video is copied and executed manually. The current MVP does not use the local App/MCP or GPT Action as the operator entry. The older GPT `g-6a002a6fc6948191b49ec2fde150ca83` was deleted and must not be recreated for production.
+
+The local App / MCP server is retained only for developer packaging experiments:
+
+```bash
+npm run app:start
+```
+
+The MCP endpoint is `http://localhost:8787/mcp`. Do not connect it to the production GPT for the current MVP. The GPT operating guide is in `docs/tiktok-producer-gpt.md`.
 
 Generate a test package with mock assets:
 
@@ -48,22 +69,29 @@ Run the formal image MVP route:
 npm run generate:top01:image-mvp
 ```
 
-`generate:top01:image-mvp` routes the first three key images to ChatGPT web `image-2` and the remaining stills to Dreamina. It requires a Codex browser adapter for ChatGPT web image generation; it must not fall back to OpenAI API or another ChatGPT image model. Dreamina prompts are Chinese-only and use `model_version=4.0` by default for free image tests.
+`generate:top01:image-mvp` routes the first three key images to ChatGPT web `image-2` and the remaining stills to Dreamina. ChatGPT image generation should run in the headed persistent browser session; it must not fall back to OpenAI API or another ChatGPT image model. Dreamina prompts are Chinese-only and use `model_version=4.0` by default for free image tests.
 
-For longer scripts, do not start with full generation. Use staged production:
+Open or check the headed ChatGPT browser session:
+
+```bash
+npm run chatgpt:browser
+npm run chatgpt:browser:status
+```
+
+For longer scripts, do not start with full generation. Start with `首段钩子预检`: the first 30 seconds to 1 minute, with shot count decided from the script. ChatGPT generates and reviews first-frame images first; approved first frames are then copied manually into Dreamina image-to-video.
 
 ```bash
 node src/cli.mjs --script fixtures/qdhoaudq-43k-script.txt --slug qdhoaudq-calibration --mode calibration --provider image-mvp --image-only --story-category make_money --product-category raise_children
 node src/cli.mjs --script fixtures/qdhoaudq-43k-script.txt --slug qdhoaudq-pilot --mode pilot --provider image-mvp --image-only --story-category make_money --product-category raise_children
 ```
 
-Only after calibration and pilot pass should a script-specific full run be planned. Routing counts are per run, not global constants. The `qdhoaudq_43k` sample uses a business-story wrapper for a raise-children product:
+Only after the opening 钩子 direction passes should a script-specific full run be planned. Routing counts are per run, not global constants. The `qdhoaudq_43k` sample uses a business-story wrapper for a raise-children product:
 
 ```bash
 npm run generate:qdhoaudq:mock
 ```
 
-That run uses `--total-shots 80`, `--video-shots 24`, and `--chatgpt-image-count 30` only for this script. Other scripts must estimate their own counts from script length, pacing, product category, and visual complexity.
+That run uses `--total-shots 80`, `--video-shots 24`, and `--chatgpt-image-count 30` only for this script. Other scripts must estimate their own counts from script length, pacing, product category, and visual complexity. The default MVP path makes ChatGPT the main image source and writes Dreamina image-to-video tasks for video shots.
 
 Run Dreamina with an explicit session and controlled concurrency:
 
@@ -105,5 +133,5 @@ Each package contains:
 - Dreamina tasks can be grouped by `--dreamina-session` and run with bounded concurrency via `--dreamina-concurrency`; timeout or rate-limit style errors should drop the next real batch to concurrency `1`.
 - Provider failures are logged per shot and do not stop the full package.
 - ChatGPT key-image generation uses ChatGPT web `image-2` because ChatGPT Pro does not include API usage.
-- ChatGPT web tasks reuse one conversation per script, start with 3-image batches, may grow to 5/10 only after stable output, and must move browser downloads into `03_key_images_chatgpt/`.
-- Video generation is not part of this MVP test; video candidate shots are generated as first-frame images.
+- ChatGPT web tasks reuse one conversation per script. Batch sizes are script-dependent: front first frames usually stay small, middle story images can expand when outputs are stable, and back conversion/book b-roll uses only as many images as the script needs.
+- Dreamina image generation is fallback only for the first GPT-first MVP. Dreamina's primary manual task is image-to-video from approved ChatGPT first frames.
