@@ -21,7 +21,7 @@ Complete the MVP without stopping at documentation only: a script must become a 
 ## Providers
 
 - `mock` provider is the default for tests and local package-shape validation.
-- ChatGPT web image generation is for key images when the Chrome plugin/browser login is available.
+- ChatGPT web image generation is for key images when the headed persistent browser session is available.
 - Dreamina is for batch images and image-to-video after `dreamina login` is complete.
 - Paid generation must not run without explicit confirmation.
 
@@ -51,14 +51,16 @@ outputs/<date>-<slug>/
   07_review_log/
 ```
 
-## Chrome Plugin Runtime
+## Browser Runtime
 
-- Default browser policy across this repository: use `playwright-persistent` for TikTok monitoring and background collection; use the Codex Chrome plugin for interactive ChatGPT/provider browser tasks.
+- Default browser policy across this repository: use `playwright-persistent` for both TikTok monitoring/background collection and ChatGPT/provider browser tasks.
 - For TikTok monitor background automation, prefer the repository's `playwright-persistent` source over Codex Chrome plugin collection.
 - Do not add direct token scraping, cookie extraction, or localStorage reads to the TikTok monitor pipeline.
 - For persistent browser automation design, treat `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace` as the reference implementation and check it before changing browser bootstrap behavior.
 - Specifically reuse the OpenClaw pattern from the Dolphin scripts first: source-profile clone -> automation-owned profile -> `chromium.launchPersistentContext(..., { channel: "chrome" })` -> dedicated page workflow -> close only the context started by the automation.
 - If the persistent TikTok collector has launch/login/profile problems, look for the answer in the OpenClaw scripts and runbooks before inventing a new browser path in this repo.
+- Use one shared source profile and separate automation-owned run profiles: TikTok monitor stays headless; ChatGPT stays headed; both may run at the same time.
+- The Codex Chrome plugin is no longer the default browser path for this repository. Use it only when the user explicitly asks for it or when persistent browser recovery has been exhausted and the exception is logged.
 - When the task specifically uses the Codex Chrome plugin, follow the Chrome runtime rules below.
 - For Chrome plugin control, use the Node REPL JavaScript execution tool. In Codex Desktop this is usually exposed as `mcp__node_repl__.js`; older logs or docs may show the flattened `mcp__node_repl__js` name.
 - Before bootstrapping the Chrome plugin runtime, temporarily set request metadata on the current Node REPL request prototype:

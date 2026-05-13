@@ -12,6 +12,12 @@ Run tests:
 npm test
 ```
 
+Run a monitor dry run with mock TikTok data and no real Feishu send:
+
+```bash
+node src/monitor-cli.mjs run-once --source mock --targets accounts,shops --dry-run-alerts --alert-recipient <your_open_id>
+```
+
 Generate a test package with mock assets:
 
 ```bash
@@ -80,3 +86,93 @@ Each package contains:
 - ChatGPT key-image generation uses ChatGPT web `image-2` because ChatGPT Pro does not include API usage.
 - ChatGPT web tasks reuse one conversation per script, start with 3-image batches, may grow to 5/10 only after stable output, and must move browser downloads into `03_key_images_chatgpt/`.
 - Video generation is not part of this MVP test; video candidate shots are generated as first-frame images.
+
+## TikTok Data Monitor MVP
+
+The monitor is separate from the content package generator. It writes local JSONL snapshots, growth signals, Feishu alert logs, and lead folders under `monitoring_data/`; that directory is ignored by git.
+
+Seed files:
+
+```text
+monitoring_data/seeds/accounts.json
+monitoring_data/seeds/shops.json
+```
+
+Account seed example:
+
+```json
+[
+  {
+    "id": "account-alpha",
+    "handle": "book_alpha",
+    "profileUrl": "https://www.tiktok.com/@book_alpha",
+    "lastKnownPostAt": "2026-05-09T01:00:00.000Z",
+    "enabled": true
+  }
+]
+```
+
+Shop seed example:
+
+```json
+[
+  {
+    "id": "shop-alpha",
+    "name": "Alpha Books",
+    "shopUrl": "https://www.tiktok.com/shop/alpha",
+    "enabled": true
+  }
+]
+```
+
+Commands:
+
+```bash
+node src/monitor-cli.mjs run-once --source mock --targets accounts,shops --dry-run-alerts
+node src/monitor-cli.mjs collect --source mock --targets accounts,shops
+node src/monitor-cli.mjs collect-persistent-batch --data-dir monitoring_data --max-seed-videos 4 --max-accounts 2
+node src/monitor-cli.mjs collect-plan --data-dir monitoring_data
+node src/monitor-cli.mjs collect-status --data-dir monitoring_data
+node src/monitor-cli.mjs analyze
+node src/monitor-cli.mjs alert --channel feishu-dm --alert-recipient <your_open_id>
+node src/monitor-cli.mjs report --data-dir monitoring_data --alert-recipient <your_open_id>
+node src/monitor-cli.mjs seed import-feishu --url <wiki_url> --from-file <exported_text_file>
+node src/monitor-cli.mjs seed promote-candidates --data-dir monitoring_data
+node src/monitor-cli.mjs base-sync --data-dir monitoring_data --base-token <base_token> --table-map '{"accounts":"tbl_x","videos":"tbl_y","signals":"tbl_z","products":"tbl_p"}'
+```
+
+Chrome collection is exposed through `runChromePluginMonitor({ browser })` in `src/monitor/chrome-plugin-runner.mjs`. Use it from the Codex `@chrome` plugin runtime after binding the plugin browser object. The bridge uses only that plugin browser object; it does not start standalone Playwright, Chromium, the system browser, or another scraping channel.
+
+### Stable background collection without the Chrome plugin
+
+Use the persistent Playwright source when you need unattended collection:
+
+```bash
+node src/monitor-cli.mjs collect-persistent-batch --data-dir monitoring_data --max-seed-videos 4 --max-accounts 2
+```
+
+This source launches its own persistent Chrome profile and does not depend on the Codex Chrome extension runtime. It collects only from visible public page content and must not read cookies, passwords, or localStorage tokens.
+
+For browser bootstrap and login stability, this source should follow the OpenClaw pattern from `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace`: clone an already logged-in source profile into an automation-owned profile, launch that owned profile with `chromium.launchPersistentContext(..., { channel: "chrome" })`, and close only the context started by the automation.
+
+The repository now assumes one shared source profile plus separate run profiles:
+- TikTok monitor: headless run profile
+- ChatGPT web work: headed run profile
+
+Both run profiles may operate at the same time as long as they clone from the same source profile instead of sharing one live run profile.
+
+For Chrome plugin runs, use bounded batches instead of one long full-pool pass. `buildChromePluginMonitorPlan({ dataDir })` writes a queue of evidence-video targets first and profile-only accounts second under `monitoring_data/state/`; `runChromePluginMonitorBatch({ browser, dataDir, config: { maxSeedVideos, maxAccounts } })` consumes the next batch, writes snapshots immediately, and advances the cursor so repeated short runs can work around the current `node_repl/js` 120-second tool limit.
+
+Chrome discovery is exposed through `discoverChromePluginCandidates({ browser })` in the same runner module. It starts with shorter `People Skills` / `Raise Children Street Smart` query variants such as `people skill`, keeps the longer book phrases as fallbacks, writes account candidates to `monitoring_data/seeds/account_candidates.json`, proactively visits matched creator profiles to discover `shop` / `product` refs, writes those to `monitoring_data/seeds/shops.json`, and applies per-query and per-profile timeouts so one slow TikTok page does not stall the full batch.
+
+When account candidates are ready for formal monitoring, promote them into `monitoring_data/seeds/accounts.json` with `node src/monitor-cli.mjs seed promote-candidates --data-dir monitoring_data` before the next account-only collection or Feishu Base sync.
+
+The Chrome bridge enforces a ledger for owned tabs, defaults to at most two collector tabs, cleans up owned tabs on failure, and never closes pre-existing user tabs. It first reads public TikTok pages without requiring login. If TikTok hides metrics, shows a login wall, blocks by verification, or hides shop data, the collector writes a structured failure and continues with the rest of the batch.
+
+All enabled, non-stale accounts are monitored at the same level. The default interval is three hours, and each account attempts to collect up to 60 public videos. Growth analysis prefers view deltas, then falls back to likes, shares, and comments when TikTok does not expose view counts.
+
+Feishu Base dashboard sync uses `lark-cli base` only. It writes a local ignored `base_record_map.json` cache so repeated syncs update existing rows by `record-id` instead of creating duplicates.
+
+Use `node src/monitor-cli.mjs report --data-dir monitoring_data --alert-recipient <your_open_id>` to send a Feishu DM summary of the current tracking pool, recent signals, and Base dashboard link.
+
+During the test phase, Feishu alerts are private-message only. `feishu-chat` is intentionally rejected until group routing is explicitly enabled later.
