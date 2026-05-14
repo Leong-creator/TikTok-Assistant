@@ -2,6 +2,10 @@
 
 Portable local plugin for running TikTok monitoring with the stable `CoBrowser` browser path.
 
+## What shows up in the plugin page
+
+Codex plugin pages primarily surface plugin metadata and skills, not raw script files. This plugin's user-facing entry is the `tiktok-monitor` skill plus the installed plugin metadata; the scripts in `scripts/` are the implementation behind that entry.
+
 ## What it does
 
 - Can run from a bundled runtime
@@ -28,9 +32,21 @@ Checklist:
 For local installation:
 
 ```powershell
-node scripts/build-bundle.mjs
 node scripts/install-local.mjs
 ```
+
+For a distributable package:
+
+```powershell
+node scripts/package-release.mjs
+```
+
+That command builds:
+
+- a ready-to-copy plugin folder
+- a matching marketplace file
+- an `install.ps1` one-click installer
+- a zip package under `dist/plugin-releases/`
 
 ## Commands
 
@@ -64,5 +80,5 @@ If the bundle is absent and `TIKTOK_MONITOR_REPO` is not set, the plugin tries:
 - Keep this folder under version control as the canonical plugin source.
 - Keep `../../.agents/plugins/marketplace.json` with the plugin so the repository carries its own local marketplace entry.
 - Build the runtime bundle before distribution.
-- Ship the built plugin folder plus the marketplace entry.
+- Ship the built plugin folder plus the marketplace entry, or ship the generated release zip with `install.ps1`.
 - On a new machine: install CoBrowser, copy this plugin, log in once, configure Feishu files, then run `node scripts/tiktok-monitor.mjs cycle`.

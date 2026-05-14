@@ -7,11 +7,14 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(path.join(scriptDir, ".."));
 const repoRoot = path.resolve(path.join(pluginRoot, "..", ".."));
 const distRuntimeRoot = path.join(pluginRoot, "dist", "runtime");
+const tempRuntimeRoot = path.join(pluginRoot, "dist", "runtime.tmp");
 
-await fs.rm(distRuntimeRoot, { recursive: true, force: true });
-await fs.mkdir(path.join(distRuntimeRoot, "monitor"), { recursive: true });
-await copyFile(path.join(repoRoot, "src", "monitor-cli.mjs"), path.join(distRuntimeRoot, "monitor-cli.mjs"));
-await copyTree(path.join(repoRoot, "src", "monitor"), path.join(distRuntimeRoot, "monitor"));
+await fs.rm(tempRuntimeRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+await fs.mkdir(path.join(tempRuntimeRoot, "monitor"), { recursive: true });
+await copyFile(path.join(repoRoot, "src", "monitor-cli.mjs"), path.join(tempRuntimeRoot, "monitor-cli.mjs"));
+await copyTree(path.join(repoRoot, "src", "monitor"), path.join(tempRuntimeRoot, "monitor"));
+await fs.rm(distRuntimeRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+await fs.rename(tempRuntimeRoot, distRuntimeRoot);
 
 console.log(JSON.stringify({
   plugin: "tiktok-monitor",

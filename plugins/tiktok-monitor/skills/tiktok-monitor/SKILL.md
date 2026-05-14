@@ -21,6 +21,8 @@ node scripts/tiktok-monitor.mjs status
 node scripts/tiktok-monitor.mjs setup
 ```
 
+This plugin is installed as a local Codex plugin. The plugin page exposes the plugin metadata and this skill; the scripts under `scripts/` are the implementation layer behind those commands.
+
 ## First-time setup reminder
 
 Before the first real collection:
@@ -30,6 +32,12 @@ Before the first real collection:
 3. Open CoBrowser headed and log in to TikTok once so its `source-profile` contains a real session.
 4. Ensure `monitoring_data/alert_config.json` exists.
 5. Ensure `monitoring_data/base_dashboard_config.json` exists if Base sync is part of the workflow.
+
+For portable distribution, the plugin can also be packaged with:
+
+```powershell
+node scripts/package-release.mjs
+```
 
 ## Notes
 

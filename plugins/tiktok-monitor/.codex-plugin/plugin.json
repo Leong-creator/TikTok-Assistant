@@ -38,6 +38,8 @@
       "Use TikTok monitor setup to review first-time configuration."
     ],
     "brandColor": "#111827",
+    "composerIcon": "./assets/tiktok-monitor.svg",
+    "logo": "./assets/tiktok-monitor.svg",
     "screenshots": []
   }
 }
