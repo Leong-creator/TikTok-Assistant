@@ -4,25 +4,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const args = process.argv.slice(2);
-const command = args[0] ?? "cycle";
-const extraArgs = args.slice(1);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(path.join(scriptDir, ".."));
 const bundledCliPath = path.join(pluginRoot, "dist", "runtime", "monitor-cli.mjs");
 
-if (command === "setup") {
-  execNodeScript(path.join(scriptDir, "setup.mjs"), extraArgs);
-  process.exit(0);
-}
-
-const runtime = resolveRuntime(process.env.TIKTOK_MONITOR_REPO);
-const dataDir = process.env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_data";
-
-const commandArgs = mapCommand(command, dataDir);
-execNodeScript(runtime.cliPath, [...commandArgs, ...extraArgs], runtime.cwd);
-
-function mapCommand(name, monitorDataDir) {
+export function mapCommand(name, monitorDataDir) {
   if (name === "cycle") {
     return ["monitor-cycle", "--source", "cobrowser", "--data-dir", monitorDataDir];
   }
@@ -35,27 +21,35 @@ function mapCommand(name, monitorDataDir) {
   throw new Error(`Unsupported TikTok monitor plugin command: ${name}`);
 }
 
-function resolveRuntime(explicitRoot) {
-  if (fs.existsSync(bundledCliPath)) {
+export function resolveRuntime(explicitRoot, cwd = process.cwd()) {
+  if (explicitRoot) {
+    const repoRoot = resolveMonitorRepoRoot(explicitRoot, cwd);
     return {
-      cliPath: bundledCliPath,
-      cwd: process.cwd()
+      cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
+      cwd: repoRoot
     };
   }
 
-  const repoRoot = resolveMonitorRepoRoot(explicitRoot);
+  if (fs.existsSync(bundledCliPath)) {
+    return {
+      cliPath: bundledCliPath,
+      cwd
+    };
+  }
+
+  const repoRoot = resolveMonitorRepoRoot(explicitRoot, cwd);
   return {
     cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
     cwd: repoRoot
   };
 }
 
-function resolveMonitorRepoRoot(explicitRoot) {
+export function resolveMonitorRepoRoot(explicitRoot, cwd = process.cwd()) {
   const candidates = [];
   if (explicitRoot) candidates.push(explicitRoot);
-  candidates.push(process.cwd());
+  candidates.push(cwd);
 
-  let current = path.resolve(process.cwd());
+  let current = path.resolve(cwd);
   for (let index = 0; index < 6; index += 1) {
     candidates.push(current);
     candidates.push(path.join(current, "TikTok Project Monitor"));
@@ -82,4 +76,24 @@ function execNodeScript(scriptPath, scriptArgs = [], cwd = process.cwd()) {
     cwd,
     stdio: "inherit"
   });
+}
+
+function main(argv = process.argv.slice(2)) {
+  const command = argv[0] ?? "cycle";
+  const extraArgs = argv.slice(1);
+
+  if (command === "setup") {
+    execNodeScript(path.join(scriptDir, "setup.mjs"), extraArgs);
+    return;
+  }
+
+  const runtime = resolveRuntime(process.env.TIKTOK_MONITOR_REPO);
+  const dataDir = process.env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_data";
+  const commandArgs = mapCommand(command, dataDir);
+  execNodeScript(runtime.cliPath, [...commandArgs, ...extraArgs], runtime.cwd);
+}
+
+const isEntryPoint = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isEntryPoint) {
+  main();
 }
