@@ -129,7 +129,9 @@ Commands:
 
 ```bash
 node src/monitor-cli.mjs run-once --source mock --targets accounts,shops --dry-run-alerts
+node src/monitor-cli.mjs monitor-cycle --source cobrowser --data-dir monitoring_data
 node src/monitor-cli.mjs collect --source mock --targets accounts,shops
+node src/monitor-cli.mjs collect-cobrowser-batch --data-dir monitoring_data
 node src/monitor-cli.mjs collect-persistent-batch --data-dir monitoring_data --max-seed-videos 4 --max-accounts 2
 node src/monitor-cli.mjs collect-plan --data-dir monitoring_data
 node src/monitor-cli.mjs collect-status --data-dir monitoring_data
@@ -141,19 +143,39 @@ node src/monitor-cli.mjs seed promote-candidates --data-dir monitoring_data
 node src/monitor-cli.mjs base-sync --data-dir monitoring_data --base-token <base_token> --table-map '{"accounts":"tbl_x","videos":"tbl_y","signals":"tbl_z","products":"tbl_p"}'
 ```
 
+Preferred npm scripts:
+
+```bash
+npm run monitor:cycle
+npm run monitor:collect:cobrowser
+npm run monitor:status
+```
+
 Chrome collection is exposed through `runChromePluginMonitor({ browser })` in `src/monitor/chrome-plugin-runner.mjs`. Use it from the Codex `@chrome` plugin runtime after binding the plugin browser object. The bridge uses only that plugin browser object; it does not start standalone Playwright, Chromium, the system browser, or another scraping channel.
 
 ### Stable background collection without the Chrome plugin
 
-Use the persistent Playwright source when you need unattended collection:
+Use the formal CoBrowser-backed command when you need unattended collection:
 
 ```bash
-node src/monitor-cli.mjs collect-persistent-batch --data-dir monitoring_data --max-seed-videos 4 --max-accounts 2
+node src/monitor-cli.mjs monitor-cycle --source cobrowser --data-dir monitoring_data
 ```
 
-This source launches its own persistent Chrome profile and does not depend on the Codex Chrome extension runtime. It collects only from visible public page content and must not read cookies, passwords, or localStorage tokens.
+For bounded manual progress within the same plan/cursor cycle:
+
+```bash
+node src/monitor-cli.mjs collect-cobrowser-batch --data-dir monitoring_data
+```
+
+This source launches its own plugin-managed persistent Chrome profile through CoBrowser and does not depend on the Codex Chrome extension runtime. It collects only from visible public page content and must not read cookies, passwords, or localStorage tokens.
 
 For browser bootstrap and login stability, this source should follow the OpenClaw pattern from `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace`: clone an already logged-in source profile into an automation-owned profile, launch that owned profile with `chromium.launchPersistentContext(..., { channel: "chrome" })`, and close only the context started by the automation.
+
+If you want a portable command outside the repo, use the local `TikTok monitor` plugin wrapper:
+
+```bash
+node C:/Users/EDY/plugins/tiktok-monitor/scripts/tiktok-monitor.mjs cycle
+```
 
 The repository now assumes one shared source profile plus separate run profiles:
 - TikTok monitor: headless run profile

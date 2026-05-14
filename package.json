@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "monitor:cycle": "node src/monitor-cli.mjs monitor-cycle --source cobrowser --data-dir monitoring_data",
+    "monitor:collect:cobrowser": "node src/monitor-cli.mjs collect-cobrowser-batch --data-dir monitoring_data",
+    "monitor:status": "node src/monitor-cli.mjs collect-status --data-dir monitoring_data",
     "generate:test": "node src/cli.mjs --script fixtures/sample-script.txt --slug demo --mode test --provider mock",
     "generate:top01:mock": "node src/cli.mjs --script fixtures/top01-reference-script.txt --slug top01-reference --mode test --provider mock --image-only",
     "generate:top01:dreamina": "node src/cli.mjs --script fixtures/top01-reference-script.txt --slug top01-reference-dreamina --mode test --provider dreamina-image --image-only",

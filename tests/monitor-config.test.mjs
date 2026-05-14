@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { resolveMonitorConfig } from "../src/monitor/config.mjs";
@@ -16,6 +19,7 @@ test("resolveMonitorConfig includes Chrome plugin batch limits", () => {
 test("resolveMonitorConfig defaults account monitoring to high coverage and three-hour thresholds", () => {
   const config = resolveMonitorConfig({});
 
+  assert.equal(config.source, "cobrowser");
   assert.equal(config.maxVideosPerAccount, 60);
   assert.equal(config.collectionIntervalHours, 3);
   assert.equal(config.min3hViews, 3000);
@@ -42,4 +46,39 @@ test("resolveMonitorConfig supports playwright-persistent source defaults", () =
   assert.equal(config.playwrightSeedProfileDir, "profiles/tiktok-seed");
   assert.equal(config.playwrightHeadless, true);
   assert.equal(config.playwrightChannel, "chrome-beta");
+});
+
+test("resolveMonitorConfig falls back to the local monitor runtime profile when the shared root does not exist", () => {
+  const originalExistsSync = fs.existsSync;
+  fs.existsSync = (targetPath) => {
+    if (targetPath === path.join(os.homedir(), ".codex", "persistent-browser-profiles")) {
+      return false;
+    }
+    return originalExistsSync(targetPath);
+  };
+
+  try {
+    const config = resolveMonitorConfig({});
+    assert.match(config.persistentBrowserRoot, /TikTok Project Monitor[\\/]\.runtime[\\/]browser$/u);
+  assert.match(config.playwrightSourceProfileDir, /tiktok-monitor-profile-headed$/u);
+  assert.match(config.playwrightProfileDir, /tiktok-monitor-run-profile-headless$/u);
+  } finally {
+    fs.existsSync = originalExistsSync;
+  }
+});
+
+test("resolveMonitorConfig exposes CoBrowser defaults", () => {
+  const config = resolveMonitorConfig({
+    COBROWSER_ROOT_DIR: "profiles/cobrowser",
+    COBROWSER_RUNTIME_MODULE: "C:/plugins/cobrowser/lib/runtime.mjs",
+    COBROWSER_HEADLESS: "false",
+    COBROWSER_PROFILE: "named-headless",
+    COBROWSER_FRESH: "false"
+  });
+
+  assert.equal(config.cobrowserRoot, "profiles/cobrowser");
+  assert.equal(config.cobrowserRuntimeModule, "C:/plugins/cobrowser/lib/runtime.mjs");
+  assert.equal(config.cobrowserHeadless, false);
+  assert.equal(config.cobrowserProfile, "named-headless");
+  assert.equal(config.cobrowserFresh, false);
 });

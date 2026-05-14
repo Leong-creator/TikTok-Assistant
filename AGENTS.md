@@ -53,7 +53,9 @@ outputs/<date>-<slug>/
 
 ## Browser Runtime
 
-- Default browser policy across this repository: use `playwright-persistent` for both TikTok monitoring/background collection and ChatGPT/provider browser tasks.
+- Default browser policy across this repository: use `CoBrowser` as the formal TikTok monitor browser shell, and keep `playwright-persistent` for the underlying repository browser client contract and ChatGPT/provider browser tasks.
+- The preferred formal monitor commands are `node src/monitor-cli.mjs monitor-cycle --source cobrowser --data-dir monitoring_data` and `node src/monitor-cli.mjs collect-cobrowser-batch --data-dir monitoring_data`.
+- A portable local plugin wrapper exists at `C:/Users/EDY/plugins/tiktok-monitor`; use it when the task should run the monitor from a new conversation or another working directory.
 - For TikTok monitor background automation, prefer the repository's `playwright-persistent` source over Codex Chrome plugin collection.
 - Do not add direct token scraping, cookie extraction, or localStorage reads to the TikTok monitor pipeline.
 - For persistent browser automation design, treat `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace` as the reference implementation and check it before changing browser bootstrap behavior.
