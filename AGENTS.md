@@ -24,7 +24,7 @@ Complete the MVP without stopping at documentation only: a script must become a 
 - ChatGPT web image generation is for key images when the headed persistent browser session is available.
 - Dreamina is for batch images and image-to-video after `dreamina login` is complete.
 - Paid generation must not run without explicit confirmation.
-- For TikTok monitor/background collection, use the repository's `playwright-persistent` collector as the default browser path.
+- For TikTok monitor/background collection, use the repository's CoBrowser-backed formal command as the default browser path: `node src/monitor-cli.mjs monitor-cycle --source cobrowser --data-dir monitoring_data` in the monitor worktree, or the portable wrapper `node C:/Users/EDY/plugins/tiktok-monitor/scripts/tiktok-monitor.mjs cycle`.
 - That collector must follow the OpenClaw browser pattern from `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace`: source-profile clone -> automation-owned profile -> `chromium.launchPersistentContext(..., { channel: "chrome" })` -> dedicated page workflow -> close only the automation-owned context.
 - For ChatGPT web image generation, review, and download in the content pipeline, use a headed `playwright-persistent` run profile that clones from the same shared source profile as TikTok monitoring.
 - Do not introduce a third browser path unless both the persistent browser path and the explicit fallback path have been proven unsuitable for the task and the failure has been recorded.
@@ -57,7 +57,7 @@ outputs/<date>-<slug>/
 
 ## Browser Runtime
 
-- Default browser policy across this repository: use `playwright-persistent` for both TikTok monitoring/background collection and ChatGPT/provider browser tasks.
+- Default browser policy across this repository: use CoBrowser-backed monitor commands for TikTok monitoring/background collection, and use `playwright-persistent` for ChatGPT/provider browser tasks.
 - Treat `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace` as the reference implementation for persistent browser bootstrap, profile seeding, login reuse, and recovery behavior.
 - Use one shared source profile and separate automation-owned run profiles: TikTok monitor stays headless; ChatGPT stays headed; both may run at the same time.
 - Do not add direct token scraping, cookie extraction, or localStorage reads to the TikTok monitor pipeline or the ChatGPT content pipeline.
