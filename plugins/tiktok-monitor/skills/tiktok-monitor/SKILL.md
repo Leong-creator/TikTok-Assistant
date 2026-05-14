@@ -1,0 +1,38 @@
+---
+name: tiktok-monitor
+description: Use when Codex should run the TikTok monitoring pipeline through CoBrowser, inspect monitoring status, or remind the user about first-time monitor setup.
+---
+
+# TikTok monitor
+
+Use this plugin when the task is:
+
+- run one full TikTok monitor cycle
+- continue bounded CoBrowser-backed collection
+- inspect collection status
+- explain first-time setup requirements
+
+## Default commands
+
+```powershell
+node scripts/tiktok-monitor.mjs cycle
+node scripts/tiktok-monitor.mjs collect-batch
+node scripts/tiktok-monitor.mjs status
+node scripts/tiktok-monitor.mjs setup
+```
+
+## First-time setup reminder
+
+Before the first real collection:
+
+1. Build the bundled runtime with `node scripts/build-bundle.mjs`, or verify the monitor repository root can be found or set `TIKTOK_MONITOR_REPO`.
+2. Verify CoBrowser is installed.
+3. Open CoBrowser headed and log in to TikTok once so its `source-profile` contains a real session.
+4. Ensure `monitoring_data/alert_config.json` exists.
+5. Ensure `monitoring_data/base_dashboard_config.json` exists if Base sync is part of the workflow.
+
+## Notes
+
+- This plugin does not scrape cookies, passwords, or localStorage.
+- This plugin is a wrapper around the repository monitor CLI; it does not replace the repository logic.
+- The default cycle command uses `monitor-cycle --source cobrowser`.

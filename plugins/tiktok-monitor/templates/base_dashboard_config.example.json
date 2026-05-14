@@ -1,0 +1,9 @@
+{
+  "baseToken": "app_or_base_token_replace_me",
+  "tableMap": {
+    "accounts": "tbl_accounts_replace_me",
+    "videos": "tbl_videos_replace_me",
+    "signals": "tbl_signals_replace_me",
+    "products": "tbl_products_replace_me"
+  }
+}
