@@ -48,12 +48,16 @@ $ErrorActionPreference = 'Stop'
 $PackageRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PluginSource = Join-Path $PackageRoot 'plugins\\tiktok-monitor'
 $PluginTarget = Join-Path $HOME 'plugins\\tiktok-monitor'
-$MarketplaceSource = Join-Path $PackageRoot '.agents\\plugins\\marketplace.json'
+$PluginCache = Join-Path $HOME '.codex\\plugins\\cache\\local-codex-plugins\\tiktok-monitor\\${version}'
 $MarketplaceTarget = Join-Path $HOME '.agents\\plugins\\marketplace.json'
+$CodexConfig = Join-Path $HOME '.codex\\config.toml'
 
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $PluginTarget) | Out-Null
 if (Test-Path $PluginTarget) { Remove-Item -Recurse -Force $PluginTarget }
 Copy-Item -Recurse -Force $PluginSource $PluginTarget
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $PluginCache) | Out-Null
+if (Test-Path $PluginCache) { Remove-Item -Recurse -Force $PluginCache }
+Copy-Item -Recurse -Force $PluginSource $PluginCache
 
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $MarketplaceTarget) | Out-Null
 $marketplace = if (Test-Path $MarketplaceTarget) {
@@ -82,10 +86,26 @@ $plugins += $entry
 $marketplace.plugins = $plugins
 $marketplace | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 $MarketplaceTarget
 
+if (-not (Test-Path $CodexConfig)) {
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $CodexConfig) | Out-Null
+  '' | Set-Content -Encoding UTF8 $CodexConfig
+}
+$configText = Get-Content $CodexConfig -Raw
+$section = "[plugins.""tiktok-monitor@local-codex-plugins""]"
+if ($configText -notmatch [regex]::Escape($section)) {
+  if ($configText.Length -gt 0 -and -not $configText.EndsWith("\`n")) {
+    $configText += "\`n"
+  }
+  $configText += "$section\`nenabled = true\`n"
+  Set-Content -Encoding UTF8 $CodexConfig $configText
+}
+
 Write-Host 'TikTok monitor installed.'
 Write-Host "Plugin: $PluginTarget"
+Write-Host "Cache: $PluginCache"
 Write-Host "Marketplace: $MarketplaceTarget"
-Write-Host 'Next: open Codex plugin page, install TikTok monitor if needed, then run node scripts/setup.mjs in the plugin folder once.'
+Write-Host "Codex config: $CodexConfig"
+Write-Host 'Next: refresh or reopen the Codex plugin page, then run node scripts/setup.mjs in the plugin folder once.'
 `.trimStart();
 }
 
