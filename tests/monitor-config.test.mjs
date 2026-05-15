@@ -59,9 +59,9 @@ test("resolveMonitorConfig falls back to the local monitor runtime profile when 
 
   try {
     const config = resolveMonitorConfig({});
-    assert.match(config.persistentBrowserRoot, /TikTok Project Monitor[\\/]\.runtime[\\/]browser$/u);
-  assert.match(config.playwrightSourceProfileDir, /tiktok-monitor-profile-headed$/u);
-  assert.match(config.playwrightProfileDir, /tiktok-monitor-run-profile-headless$/u);
+    assert.match(config.persistentBrowserRoot, /TikTok Project[\\/]\.runtime[\\/]browser$/u);
+    assert.match(config.playwrightSourceProfileDir, /tiktok-monitor-profile-headed$/u);
+    assert.match(config.playwrightProfileDir, /tiktok-monitor-run-profile-headless$/u);
   } finally {
     fs.existsSync = originalExistsSync;
   }
