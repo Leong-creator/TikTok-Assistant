@@ -16,17 +16,19 @@ const url = args.url ?? "https://chatgpt.com/";
 const channel = args.channel ?? "chrome";
 const logFile = args["log-file"];
 
-const playwright = loadPlaywright();
-const context = await startPersistentChromeContext({
-  playwright,
-  profileDir: runProfileDir,
-  sourceProfileDir,
-  headless: false,
-  channel,
-  acceptDownloads: createHeadedChatGptLaunchOptions().acceptDownloads
-});
+let context;
 
 try {
+  const playwright = loadPlaywright();
+  context = await startPersistentChromeContext({
+    playwright,
+    profileDir: runProfileDir,
+    sourceProfileDir,
+    headless: false,
+    channel,
+    acceptDownloads: createHeadedChatGptLaunchOptions().acceptDownloads
+  });
+
   const page = context.pages()[0] || await context.newPage();
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {});
   await mkdir(path.dirname(statusFile), { recursive: true });
@@ -47,8 +49,33 @@ try {
   }
   console.log("READY_FOR_LOGIN");
   await new Promise(() => {});
+} catch (error) {
+  await mkdir(path.dirname(statusFile), { recursive: true });
+  await writeJson(statusFile, {
+    status: "failed",
+    pid: process.pid,
+    failedAt: new Date().toISOString(),
+    mode: "headed",
+    backend: "playwright-persistent-headed",
+    sourceProfileDir: path.resolve(sourceProfileDir),
+    runProfileDir: path.resolve(runProfileDir),
+    url,
+    channel,
+    error: error instanceof Error ? error.message : String(error)
+  });
+  if (logFile) {
+    await mkdir(path.dirname(logFile), { recursive: true });
+    await appendFile(
+      logFile,
+      `${new Date().toISOString()} FAILED ${url} ${error instanceof Error ? error.message : String(error)}\n`,
+      "utf8"
+    );
+  }
+  throw error;
 } finally {
-  await context.close().catch(() => {});
+  if (context) {
+    await context.close().catch(() => {});
+  }
 }
 
 function parseArgs(argv) {

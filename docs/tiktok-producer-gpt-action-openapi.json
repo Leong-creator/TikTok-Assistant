@@ -1,0 +1,101 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TikTok素材制作助手",
+    "version": "0.1.0",
+    "description": "粘贴短视频脚本后创建首段钩子预检包，准备 ChatGPT 生图任务和即梦图生视频人工任务，不自动生成图片或视频。"
+  },
+  "servers": [
+    {
+      "url": "https://replication-sender-replies-scenes.trycloudflare.com"
+    }
+  ],
+  "paths": {
+    "/api/start-script-workflow": {
+      "post": {
+        "operationId": "startScriptWorkflow",
+        "x-openai-isConsequential": false,
+        "summary": "开始制作短视频素材包",
+        "description": "保存脚本并创建首段钩子预检包。先覆盖前 30 秒到 1 分钟，准备 ChatGPT 首帧图任务和即梦图生视频人工任务。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "script": {
+                    "type": "string",
+                    "description": "用户粘贴的完整短视频口播脚本。"
+                  },
+                  "productName": {
+                    "type": "string",
+                    "description": "可选商品名。"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "description": "可选补充要求；测试阶段应写明不生成图片或视频。"
+                  }
+                },
+                "required": ["script"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "已创建本地素材制作包。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "固定为 ok。"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "给用户看的中文结果说明。"
+                    },
+                    "packageDir": {
+                      "type": "string",
+                      "description": "本地素材包目录。"
+                    },
+                    "stageName": {
+                      "type": "string",
+                      "description": "当前动作，第一版固定为首段钩子预检。"
+                    },
+                    "finalCountStatus": {
+                      "type": "string",
+                      "description": "最终数量状态；必须提示未确认。"
+                    },
+                    "generatedMedia": {
+                      "type": "string",
+                      "description": "本次是否生成媒体；测试阶段固定为 none。"
+                    },
+                    "nextAction": {
+                      "type": "string",
+                      "description": "GPT 收到结果后要继续给用户说明的下一步。"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "packageDir",
+                    "stageName",
+                    "finalCountStatus",
+                    "generatedMedia",
+                    "nextAction"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

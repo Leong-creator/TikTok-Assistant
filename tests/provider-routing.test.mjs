@@ -14,7 +14,7 @@ The poor chase effort, but the rich build machines that keep working after they 
 This book explains the difference in a way anyone can understand.
 `;
 
-test("image-mvp routes key images to ChatGPT web image-2 and bulk stills to Dreamina", async () => {
+test("image-mvp routes default test images to ChatGPT web image-2 for the GPT-first MVP", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "tk-image-mvp-"));
   const calls = [];
   try {
@@ -34,14 +34,13 @@ test("image-mvp routes key images to ChatGPT web image-2 and bulk stills to Drea
 
     assert.equal(result.summary.provider, "image-mvp");
     assert.equal(result.summary.totalShots, 20);
-    assert.equal(result.summary.videoShots, 5);
-    assert.equal(result.summary.imageShots, 15);
+    assert.equal(result.summary.videoShots, 8);
+    assert.equal(result.summary.imageShots, 12);
+    assert.equal(result.summary.chatgptImageShots, 20);
+    assert.equal(result.summary.dreaminaImageShots, 0);
+    assert.equal(result.summary.dreaminaVideoShots, 8);
 
-    assert.deepEqual(
-      calls.slice(0, 3).map((call) => call.provider),
-      ["chatgpt-web-image2", "chatgpt-web-image2", "chatgpt-web-image2"]
-    );
-    assert.ok(calls.slice(3).every((call) => call.provider === "dreamina-image"));
+    assert.ok(calls.every((call) => call.provider === "chatgpt-web-image2"));
     assert.equal(calls.length, 20);
 
     const manifest = JSON.parse(
@@ -50,15 +49,15 @@ test("image-mvp routes key images to ChatGPT web image-2 and bulk stills to Drea
     assert.equal(manifest.shots[0].provider, "chatgpt-web-image2");
     assert.equal(manifest.shots[0].assetType, "image");
     assert.equal(manifest.shots[0].storyboardAssetType, "video");
-    assert.match(manifest.shots[0].suggestedEdit, /first frame/i);
-    assert.equal(manifest.shots[3].provider, "dreamina-image");
+    assert.match(manifest.shots[0].suggestedEdit, /即梦图生视频首帧/);
+    assert.equal(manifest.shots[3].provider, "chatgpt-web-image2");
     assert.match(manifest.shots[0].assetPath, /^03_key_images_chatgpt\//);
-    assert.match(manifest.shots[3].assetPath, /^04_bulk_images_dreamina\//);
+    assert.match(manifest.shots[3].assetPath, /^03_key_images_chatgpt\//);
 
     const reviewLog = await readFile(path.join(result.packageDir, "07_review_log/prompt_iterations.jsonl"), "utf8");
     const reviewLines = reviewLog.trim().split("\n").map((line) => JSON.parse(line));
     assert.equal(reviewLines[0].provider, "chatgpt-web-image2");
-    assert.equal(reviewLines[3].provider, "dreamina-image");
+    assert.equal(reviewLines[3].provider, "chatgpt-web-image2");
     assert.ok(reviewLines.every((line) => line.status === "accepted"));
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -84,10 +83,11 @@ test("long-script staged modes start with calibration before pilot or full gener
       }
     });
 
-    assert.equal(calibration.summary.totalShots, 8);
-    assert.equal(calibration.summary.videoShots, 3);
-    assert.equal(calibration.summary.chatgptImageShots, 4);
-    assert.equal(calibration.summary.dreaminaImageShots, 4);
+    assert.equal(calibration.summary.totalShots, 12);
+    assert.equal(calibration.summary.videoShots, 8);
+    assert.equal(calibration.summary.chatgptImageShots, 12);
+    assert.equal(calibration.summary.dreaminaImageShots, 0);
+    assert.equal(calibration.summary.dreaminaVideoShots, 8);
 
     const pilot = await generateAssetPackage({
       script,
@@ -103,10 +103,11 @@ test("long-script staged modes start with calibration before pilot or full gener
       }
     });
 
-    assert.equal(pilot.summary.totalShots, 20);
-    assert.equal(pilot.summary.videoShots, 8);
-    assert.equal(pilot.summary.chatgptImageShots, 8);
-    assert.equal(pilot.summary.dreaminaImageShots, 12);
+    assert.equal(pilot.summary.totalShots, 28);
+    assert.equal(pilot.summary.videoShots, 12);
+    assert.equal(pilot.summary.chatgptImageShots, 20);
+    assert.equal(pilot.summary.dreaminaImageShots, 8);
+    assert.equal(pilot.summary.dreaminaVideoShots, 12);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

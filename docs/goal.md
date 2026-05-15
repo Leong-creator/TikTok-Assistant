@@ -1,18 +1,20 @@
 # Current Goal
 
 ```text
-Complete the TikTok content production MVP without stopping until a script can be transformed into a local CapCut-ready asset folder containing structured scripts, storyboard, fixed-style prompts, reviewed key images, reviewed batch image/video generation outputs, an editing manifest, and a manual CapCut import guide. Do not stop except for required user login/authorization, paid-generation confirmation, or a hard external service blocker. Keep a checkpoint log after each milestone and verify every generated asset against the prompt before retrying or accepting it.
+Build the GPT-first TikTok素材制作助手 MVP without disrupting existing pipeline behavior. ChatGPT handles script understanding, Chinese 钩子 review, segmented storyboards, key first-frame images, image review, prompt iteration, and final prompt复盘. The current operator MVP does not use the local App/MCP or GPT Action as the production entry; those remain developer-only packaging experiments. Do not run Dreamina image-to-video or any paid generation automatically. Stop only for required login, explicit paid-provider confirmation, or a hard external-service blocker, and record any blocker in the project logs.
 ```
 
 ## Operational Notes
 
 - The repository implementation uses the `mock` provider for unattended validation.
-- ChatGPT web image generation is planned for key images through the Chrome extension backend.
-- Dreamina batch generation is planned after CLI login and explicit paid-generation confirmation.
-- No video generation command should run automatically during setup.
+- ChatGPT web image generation is the main image path: front first frames use smaller batches, middle images use larger batches, and back conversion/book b-roll uses moderate batches.
+- Dreamina still-image generation is fallback only for the first GPT-first MVP.
+- Dreamina image-to-video is the key manual downstream task, but no command should run automatically during setup.
+- The local ChatGPT App exposes MCP tools for developer experiments only; it is not part of the current operator MVP.
 
 ## Current External State
 
-- Chrome extension backend is available.
-- A Dreamina OAuth Device Flow login page was opened in Chrome.
-- `dreamina user_credit` still reports no valid login until authorization is completed.
+- Local MCP/App server implementation is working for developer packaging experiments.
+- ChatGPT Developer Mode App and custom GPT Action are not part of the current operator MVP.
+- Formal production starts in the `TikTok素材制作助手` GPT chat itself, not through App, Action, Codex, or local package creation.
+- Dreamina login and credit confirmation remain external blockers for real image-to-video generation.

@@ -28,8 +28,8 @@ test("generateAssetPackage creates a CapCut-ready test package with manifests an
 
     assert.equal(path.basename(result.packageDir), "2026-05-09-hotel-money");
     assert.equal(result.summary.totalShots, 20);
-    assert.equal(result.summary.videoShots, 5);
-    assert.equal(result.summary.imageShots, 15);
+    assert.equal(result.summary.videoShots, 8);
+    assert.equal(result.summary.imageShots, 12);
 
     const requiredFiles = [
       "00_script/original.txt",
@@ -57,8 +57,8 @@ test("generateAssetPackage creates a CapCut-ready test package with manifests an
       await readFile(path.join(result.packageDir, "06_editing_package/editing_manifest.json"), "utf8")
     );
     assert.equal(manifest.shots.length, 20);
-    assert.equal(manifest.shots.filter((shot) => shot.assetType === "video").length, 5);
-    assert.equal(manifest.shots.filter((shot) => shot.assetType === "image").length, 15);
+    assert.equal(manifest.shots.filter((shot) => shot.assetType === "video").length, 8);
+    assert.equal(manifest.shots.filter((shot) => shot.assetType === "image").length, 12);
     assert.ok(manifest.shots.every((shot) => shot.assetPath));
 
     const reviewLog = await readFile(path.join(result.packageDir, "07_review_log/prompt_iterations.jsonl"), "utf8");

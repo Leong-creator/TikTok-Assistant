@@ -6,6 +6,38 @@ Provider work must reuse mature, already available capabilities before adding ne
 
 ## Current Providers
 
+## Chrome Plugin Recovery
+
+When `@chrome` reports `browser-client is not trusted` or the bridge looks disconnected while Chrome, the extension, and the native host are installed, run:
+
+```bash
+npm run chrome:ready
+```
+
+This follows the previously verified recovery path for this Windows setup: it clears stale Codex Chrome `extension-host.exe` processes under the bundled Chrome plugin cache, restores the `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.openai.codexextension` manifest pointer when needed, then runs the official Chrome plugin health checks. Do not switch to another browser or image provider for ChatGPT web work unless the Chrome plugin remains unavailable after this recovery.
+
+Chrome browser operations use the shared `codex-chrome-short-step-dom-first-v1` policy now written into `chatgpt_session.json`, each `chatgpt_web_tasks/*.json`, `provider_task_manifest.json`, App run logs, and `npm run chrome:ready` output. The policy keeps the official Codex Chrome plugin path, but changes execution style:
+
+- Prefer short DOM snapshots, targeted element attributes, and image/media metadata before screenshots.
+- Avoid full-page screenshots and long one-shot polling loops on image-heavy ChatGPT conversations.
+- Keep each browser action under about 15 seconds and each polling window under about 30 seconds; after a timeout, run `npm run chrome:ready` before continuing.
+- Prefer Chrome plugin semantic download/media APIs, then the recursive `download-collector`; coordinate clicks remain a logged last resort.
+- If the page remains unreadable after recovery, keep the live tab open for human visual review and record the supervision gap instead of declaring the image accepted.
+
+The TikTok monitoring plan uses the same policy: short DOM/metadata reads, checkpoint after each page or tab state transition, and no screenshot polling loop.
+
+In this Codex desktop runtime, the trusted browser client is loaded from the bundled Browser client, while the selected backend must still be Chrome extension:
+
+```js
+const { setupAtlasRuntime } = await import(
+  "file:///C:/Users/EDY/.codex/plugins/cache/openai-bundled/browser-use/0.1.0-alpha2/scripts/browser-client.mjs"
+);
+await setupAtlasRuntime({ globals: globalThis });
+globalThis.browser = await agent.browsers.get("extension");
+```
+
+This avoids the `browser-client is not trusted` failure from importing the Chrome plugin client path directly, but still uses the `@chrome` extension backend for ChatGPT web work.
+
 ### `mock`
 
 Creates SVG placeholders and mock video descriptors. This is used for tests and package-shape validation.
@@ -17,7 +49,7 @@ Key-image adapter:
 1. Use Codex Chrome extension backend when ChatGPT is already logged in.
 2. Select/use ChatGPT web `image-2` only.
 3. Submit only provider-compiled image prompts, not raw script text or workflow instructions.
-4. Start with one image prompt. If accepted, batch 2-3. Only grow to 5/10 after ChatGPT returns separate standalone images without panel/grid merging.
+4. Batch size is segment-specific: front first frames use 2-4 images, middle story images use 6-12, and back conversion/book b-roll uses 3-6. Fall back to one image when quality drops or ChatGPT returns panels.
 5. Save generated assets into `03_key_images_chatgpt/`.
 6. Run the same review loop and prompt iteration log.
 
@@ -53,15 +85,26 @@ Default image model: `4.0`, because the user's account currently treats it as fr
 
 Observed quality note: Dreamina `4.0` is usable for low-cost bulk stills only after prompt cleanup. Earlier English/reference-style prompts produced panels and visible text. Wording such as "subtitle space" can also cause fake lower-third text or empty bottom bands. The stronger direction is Chinese-only, single-frame cinematic illustrated still, no text, full-frame composition, no layout language, and no requested caption area.
 
-This MVP does not run `dreamina image2video`.
+For the GPT-first MVP, Dreamina still-image generation is fallback only. ChatGPT is the primary image generator unless it is unavailable or a simple補图 task is explicitly routed to Dreamina.
+
+### `dreamina-image-to-video`
+
+Manual image-to-video task:
+
+1. Generate and review the first-frame image in ChatGPT.
+2. Upload the approved first frame to Dreamina image-to-video manually.
+3. Copy the corresponding prompt from `07_review_log/dreamina_image_to_video_tasks.json`.
+4. Save the returned video into `05_video_clips_dreamina/`.
+
+Each prompt must describe script intent, first-frame continuity, action change, camera movement, emotional change, scene dynamics, duration, ending state, and negative constraints. Do not run image-to-video automatically or consume credits without explicit confirmation.
 
 ### `image-mvp`
 
-Formal image-only MVP route:
+GPT-first MVP route:
 
-- First three key shots: `chatgpt-web-image2`.
-- Remaining shots: `dreamina-image`.
-- Existing video candidate shots remain video candidates in the storyboard, but this run generates first-frame images only.
+- ChatGPT creates the primary first-frame and story images.
+- Dreamina image generation is fallback only.
+- Existing video candidate shots remain video candidates in the storyboard, but this run prepares first-frame images plus manual Dreamina image-to-video tasks.
 - The editing manifest records both `assetType` and `storyboardAssetType`.
 
 ## Dreamina Local Status

@@ -96,9 +96,15 @@ Image 2:
 
 - "Use ChatGPT web image generation" is too indirect. Start with `Create one image now` or `Create N separate images now`.
 - Do not put review policy, tool policy, provider notes, or long script context in the generation prompt. Keep those in Codex logs and manifests.
-- Batch prompts that list several shot IDs can make ChatGPT produce one combined storyboard page. Use `Image 1`, `Image 2`, etc. in the creative prompt and keep shot IDs outside the image body.
+- Batch prompts or retry prompts that list shot IDs can make ChatGPT produce one combined storyboard page or draw labels into the image. Use `Image 1`, `Image 2`, etc. in assistant message labels and keep shot IDs outside the creative image body. For a new script, generate S001 first as a clean standalone image before expanding batch size.
 - The useful structure from the reference conversation is: fixed character bible first, then per-shot fields for subject, camera, action, micro-expression, setting, dynamics, and style. That structure should be compiled before generation, not improvised in the browser.
 - If the page answers with prompt analysis instead of images, the provider step failed. Retry with the image tool selected and a shorter single-image prompt before expanding the batch.
+- Do not print the full production prompt into the same chat message before calling ChatGPT image generation. Use a hidden clean creative prompt for the tool call first; after the image is accepted, output the prompt in the review log for reuse.
+- For non-hook continuation shots, keep one core action per image. Overloaded prompts that combine breakfast, cleaning, shower steam, towels, utilities, parking, and money cues are likely to become storyboards or text-heavy panels.
+- In the GPT-only workflow, storyboard prompts are an internal prompt bank. After the operator says "继续", GPT should automatically use the next compiled prompt(s) to generate images, not paste the whole prompt bank into the chat first.
+- Separate `image_prompt_clean` from `record_prompt`. The clean prompt goes to the image tool and contains only visual scene content; the record prompt is shown after the image passes and can include shot IDs, naming, Dreamina video instructions, and review notes.
+- Continuation batches must advance distinct next script beats. Do not generate several variants of the same beat to satisfy a batch count; repeated variants are allowed only when the previous image failed review or the operator explicitly asks for alternatives.
+- Avoid repeatedly putting `storyboard`, `panel`, `grid`, `page`, or shot IDs in negative constraints. When these terms appear too often, ChatGPT may still render them as a storyboard concept. Prefer positive framing: `one standalone vertical scene, one continuous moment, no visible text or labels`.
 
 ## Dreamina 4.0 Prompt Rule
 

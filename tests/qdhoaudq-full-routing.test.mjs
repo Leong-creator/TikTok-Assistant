@@ -37,6 +37,7 @@ test("qdhoaudq full package supports business story plus raise-children product 
     assert.equal(result.summary.videoShots, 24);
     assert.equal(result.summary.chatgptImageShots, 30);
     assert.equal(result.summary.dreaminaImageShots, 50);
+    assert.equal(result.summary.dreaminaVideoShots, 24);
     assert.equal(result.summary.storyCategory, "make_money");
     assert.equal(result.summary.productCategory, "raise_children");
     assert.equal(calls.filter((call) => call.provider === "chatgpt-web-image2").length, 30);
@@ -52,18 +53,24 @@ test("qdhoaudq full package supports business story plus raise-children product 
     assert.equal(manifest.shots.filter((shot) => shot.provider === "chatgpt-web-image2").length, 30);
     assert.equal(manifest.shots.filter((shot) => shot.provider === "dreamina-image").length, 50);
     assert.equal(manifest.shots.filter((shot) => shot.storyboardAssetType === "video").length, 24);
-    assert.ok(manifest.shots.filter((shot) => shot.storyboardAssetType === "video").every((shot) => /first frame/i.test(shot.suggestedEdit)));
+    assert.ok(manifest.shots.filter((shot) => shot.storyboardAssetType === "video").every((shot) => /即梦图生视频首帧/.test(shot.suggestedEdit)));
 
     const storyboard = JSON.parse(
       await readFile(path.join(result.packageDir, "01_storyboard/storyboard.json"), "utf8")
     );
     assert.equal(storyboard[0].storyCategory, "make_money");
     assert.equal(storyboard[0].productCategory, "raise_children");
-    assert.ok(storyboard.slice(0, 64).every((shot) => shot.section !== "conversion"));
-    assert.ok(storyboard.slice(-8).every((shot) => shot.section === "conversion"));
+    assert.ok(storyboard.slice(0, 64).every((shot) => !["conversion_video", "book_broll"].includes(shot.section)));
+    assert.ok(storyboard.slice(0, 12).every((shot) => shot.section === "hook_video"));
+    assert.ok(storyboard.slice(64, 76).every((shot) => shot.section === "conversion_video"));
+    assert.ok(storyboard.slice(-4).every((shot) => shot.section === "book_broll"));
 
     const prompts = JSON.parse(await readFile(path.join(result.packageDir, "02_prompts/prompts.json"), "utf8"));
     assert.ok(prompts.slice(0, 24).every((prompt) => prompt.videoPrompt));
+    assert.ok(prompts.filter((prompt) => prompt.assetType === "video").every((prompt) => /根据上传的首帧图生成一个竖版短视频片段/.test(prompt.dreaminaVideoPrompt)));
+    assert.ok(prompts.slice(0, 12).every((prompt) => prompt.chatgptBatchPolicy.recommendedBatchSize === "2-4"));
+    assert.ok(prompts.slice(12, 64).every((prompt) => prompt.chatgptBatchPolicy.recommendedBatchSize === "6-12"));
+    assert.ok(prompts.slice(-4).every((prompt) => prompt.operatorSectionName === "图书空镜"));
     assert.ok(prompts.every((prompt) => !/caption space|clean center space|lower-third/i.test(prompt.imagePrompt)));
     assert.ok(prompts.every((prompt) => !/底部.*负空间|预留.*字幕|大面积空白/.test(prompt.generationPrompt)));
     assert.ok(prompts.every((prompt) => /不要上下分屏/.test(prompt.generationPrompt)));

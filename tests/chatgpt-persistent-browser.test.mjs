@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -34,6 +34,56 @@ test("resolveChatGptPersistentBrowserConfig uses a shared source profile plus a 
   assert.equal(config.runProfileDir, path.resolve("C:/profiles/chatgpt-headed"));
   assert.match(config.statusFile, /chatgpt-persistent-session\.json$/);
   assert.equal(config.url, "https://chatgpt.com/");
+});
+
+test("resolveChatGptPersistentBrowserConfig prefers the CoBrowser source profile when present", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-chatgpt-browser-cobrowser-"));
+  try {
+    const projectDir = path.join(root, "TikTok Project");
+    const coBrowserRoot = path.join(root, ".codex-cobrowser");
+    const coBrowserSourceDir = path.join(coBrowserRoot, "source-profile");
+    await mkdir(coBrowserSourceDir, { recursive: true });
+
+    const config = resolveChatGptPersistentBrowserConfig({
+      cwd: projectDir,
+      env: {
+        COBROWSER_HOME: coBrowserRoot
+      }
+    });
+
+    assert.equal(config.rootDir, path.resolve(coBrowserRoot));
+    assert.equal(config.sourceProfileDir, path.resolve(coBrowserSourceDir));
+    assert.equal(
+      config.runProfileDir,
+      path.resolve(path.join(projectDir, ".runtime", "browser", "chatgpt-web-run-profile-headed"))
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("resolveChatGptPersistentBrowserConfig falls back to the monitor login profile when shared roots are absent", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-chatgpt-browser-fallback-"));
+  try {
+    const projectDir = path.join(root, "TikTok Project");
+    const monitorSourceDir = path.join(root, "TikTok Project Monitor", ".runtime", "browser", "tiktok-monitor-profile-headed");
+    await mkdir(monitorSourceDir, { recursive: true });
+
+    const config = resolveChatGptPersistentBrowserConfig({
+      cwd: projectDir,
+      env: {
+        COBROWSER_HOME: path.join(root, "missing-cobrowser")
+      }
+    });
+
+    assert.equal(config.sourceProfileDir, path.resolve(monitorSourceDir));
+    assert.equal(
+      config.runProfileDir,
+      path.resolve(path.join(projectDir, ".runtime", "browser", "chatgpt-web-run-profile-headed"))
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("openChatGptPersistentBrowser writes launching status and uses detached headed session semantics", async () => {
@@ -73,6 +123,37 @@ test("readChatGptPersistentBrowserStatus returns a not-started shaped payload be
     const status = await readChatGptPersistentBrowserStatus({ cwd: root, env: {} });
     assert.equal(status.status, "not_started");
     assert.equal(status.backend, "playwright-persistent-headed");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("readChatGptPersistentBrowserStatus reports stale ready state when launcher pid is gone", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tk-chatgpt-browser-stale-"));
+  try {
+    const statusFile = path.join(root, "runtime", "chatgpt-status.json");
+    await mkdir(path.dirname(statusFile), { recursive: true });
+    await writeFile(statusFile, JSON.stringify({
+      status: "ready",
+      pid: 987654,
+      backend: "playwright-persistent-headed",
+      sourceProfileDir: "old-source",
+      runProfileDir: "old-run",
+      url: "https://chatgpt.com/"
+    }), "utf8");
+
+    const status = await readChatGptPersistentBrowserStatus({
+      cwd: root,
+      env: {
+        CHATGPT_PERSISTENT_STATUS_FILE: statusFile,
+        COBROWSER_HOME: path.join(root, "missing-cobrowser")
+      },
+      isProcessRunning: () => false
+    });
+
+    assert.equal(status.status, "stopped");
+    assert.equal(status.previousStatus, "ready");
+    assert.equal(status.sourceProfileDir, path.resolve(path.join(root, "missing-cobrowser", "source-profile")));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

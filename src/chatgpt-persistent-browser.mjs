@@ -1,5 +1,7 @@
+import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,14 +14,23 @@ export function resolveChatGptPersistentBrowserConfig({
   env = process.env,
   cwd = process.cwd()
 } = {}) {
+  const resolvedCwd = path.resolve(cwd);
+  const runtimeDir = path.resolve(env.CHATGPT_PERSISTENT_RUNTIME_DIR ?? path.join(resolvedCwd, ".runtime", "browser"));
+  const hasExplicitSharedRoot = Boolean(env.TIKTOK_PERSISTENT_BROWSER_ROOT_DIR);
   const sharedRoot = env.TIKTOK_PERSISTENT_BROWSER_ROOT_DIR ?? defaultPersistentBrowserRoot();
+  const coBrowserRoot = resolveCoBrowserRoot(env);
+  const rootDir = hasExplicitSharedRoot || fs.existsSync(sharedRoot)
+    ? sharedRoot
+    : fs.existsSync(coBrowserRoot)
+      ? coBrowserRoot
+      : runtimeDir;
+  const sourceProfileDir = resolveSourceProfileDir({ env, cwd: resolvedCwd, sharedRoot, runtimeDir, coBrowserRoot });
   const profiles = resolvePersistentBrowserProfiles({
-    rootDir: sharedRoot,
-    sourceProfileDir: env.TIKTOK_SHARED_SOURCE_PROFILE_DIR,
-    runProfileDir: env.CHATGPT_PLAYWRIGHT_RUN_PROFILE_DIR,
+    rootDir,
+    sourceProfileDir,
+    runProfileDir: env.CHATGPT_PLAYWRIGHT_RUN_PROFILE_DIR ?? path.join(runtimeDir, "chatgpt-web-run-profile-headed"),
     runName: "chatgpt-web-run-profile-headed"
   });
-  const runtimeDir = path.resolve(cwd, ".runtime", "browser");
   return {
     rootDir: profiles.rootDir,
     sourceProfileDir: profiles.sourceProfileDir,
@@ -83,11 +94,28 @@ export async function openChatGptPersistentBrowser({
 
 export async function readChatGptPersistentBrowserStatus({
   env = process.env,
-  cwd = process.cwd()
+  cwd = process.cwd(),
+  isProcessRunning = defaultIsProcessRunning
 } = {}) {
   const config = resolveChatGptPersistentBrowserConfig({ env, cwd });
   try {
-    return JSON.parse(await readFile(config.statusFile, "utf8"));
+    const status = JSON.parse(await readFile(config.statusFile, "utf8"));
+    if (
+      (status.status === "ready" || status.status === "launching") &&
+      status.pid &&
+      !isProcessRunning(Number(status.pid))
+    ) {
+      return {
+        ...status,
+        status: "stopped",
+        previousStatus: status.status,
+        sourceProfileDir: config.sourceProfileDir,
+        runProfileDir: config.runProfileDir,
+        statusFile: config.statusFile,
+        url: config.url
+      };
+    }
+    return status;
   } catch (error) {
     if (error?.code === "ENOENT") {
       return {
@@ -105,4 +133,43 @@ export async function readChatGptPersistentBrowserStatus({
 
 async function writeJson(filePath, value) {
   await writeFile(filePath, JSON.stringify(value, null, 2) + "\n", "utf8");
+}
+
+function resolveSourceProfileDir({ env, cwd, sharedRoot, runtimeDir, coBrowserRoot }) {
+  if (env.TIKTOK_SHARED_SOURCE_PROFILE_DIR) {
+    return path.resolve(env.TIKTOK_SHARED_SOURCE_PROFILE_DIR);
+  }
+
+  const candidates = [
+    path.join(coBrowserRoot, "source-profile"),
+    path.join(sharedRoot, "shared-source-profile"),
+    path.join(cwd, "..", "TikTok Project Monitor", ".runtime", "browser", "tiktok-monitor-profile-headed"),
+    path.join(runtimeDir, "shared-source-profile"),
+    path.join(runtimeDir, "tiktok-monitor-profile-headed")
+  ];
+
+  return firstExistingPath(candidates) ?? candidates[0];
+}
+
+function firstExistingPath(paths) {
+  for (const candidate of paths) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function resolveCoBrowserRoot(env = process.env) {
+  return path.resolve(env.COBROWSER_HOME ?? path.join(os.homedir(), ".codex-cobrowser"));
+}
+
+function defaultIsProcessRunning(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
 }
