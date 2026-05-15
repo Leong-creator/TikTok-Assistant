@@ -48,9 +48,29 @@ test("resolveMonitorConfig supports playwright-persistent source defaults", () =
   assert.equal(config.playwrightChannel, "chrome-beta");
 });
 
-test("resolveMonitorConfig falls back to the local monitor runtime profile when the shared root does not exist", () => {
+test("resolveMonitorConfig prefers CoBrowser as the machine-wide persistent browser root", () => {
+  const config = resolveMonitorConfig({
+    COBROWSER_HOME: "profiles/cobrowser"
+  });
+
+  assert.equal(config.persistentBrowserRoot, "profiles/cobrowser");
+  assert.equal(config.playwrightSourceProfileDir, path.join("profiles/cobrowser", "source-profile"));
+  assert.equal(
+    config.playwrightProfileDir,
+    path.join("profiles/cobrowser", "run-profiles", "tiktok-monitor-run-profile-headless")
+  );
+  assert.equal(
+    config.chatgptPlaywrightRunProfileDir,
+    path.join("profiles/cobrowser", "run-profiles", "chatgpt-web-run-profile-headed")
+  );
+});
+
+test("resolveMonitorConfig falls back to the local monitor runtime profile when shared roots do not exist", () => {
   const originalExistsSync = fs.existsSync;
   fs.existsSync = (targetPath) => {
+    if (targetPath === path.join(os.homedir(), ".codex-cobrowser")) {
+      return false;
+    }
     if (targetPath === path.join(os.homedir(), ".codex", "persistent-browser-profiles")) {
       return false;
     }
@@ -60,8 +80,8 @@ test("resolveMonitorConfig falls back to the local monitor runtime profile when 
   try {
     const config = resolveMonitorConfig({});
     assert.match(config.persistentBrowserRoot, /TikTok Project Monitor[\\/]\.runtime[\\/]browser$/u);
-  assert.match(config.playwrightSourceProfileDir, /tiktok-monitor-profile-headed$/u);
-  assert.match(config.playwrightProfileDir, /tiktok-monitor-run-profile-headless$/u);
+    assert.match(config.playwrightSourceProfileDir, /tiktok-monitor-profile-headed$/u);
+    assert.match(config.playwrightProfileDir, /tiktok-monitor-run-profile-headless$/u);
   } finally {
     fs.existsSync = originalExistsSync;
   }

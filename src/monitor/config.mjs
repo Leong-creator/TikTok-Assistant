@@ -4,8 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function resolveMonitorConfig(env = process.env) {
-  const persistentBrowserRoot = env.TIKTOK_PERSISTENT_BROWSER_ROOT_DIR ?? defaultPersistentBrowserRoot();
+  const persistentBrowserRoot = env.TIKTOK_PERSISTENT_BROWSER_ROOT_DIR ?? defaultPersistentBrowserRoot({ env });
   const usingLocalRuntimeRoot = isLocalMonitorRuntimeRoot(persistentBrowserRoot);
+  const usingCoBrowserRoot = isCoBrowserRoot(persistentBrowserRoot, { env });
   return {
     dataDir: env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_data",
     source: env.TIKTOK_MONITOR_SOURCE ?? "cobrowser",
@@ -18,24 +19,15 @@ export function resolveMonitorConfig(env = process.env) {
     playwrightProfileDir:
       env.TIKTOK_PLAYWRIGHT_RUN_PROFILE_DIR ??
       env.TIKTOK_PLAYWRIGHT_PROFILE_DIR ??
-      path.join(
-        persistentBrowserRoot,
-        usingLocalRuntimeRoot ? "tiktok-monitor-run-profile-headless" : "tiktok-monitor-run-profile-headless"
-      ),
+      defaultRunProfileDir(persistentBrowserRoot, "tiktok-monitor-run-profile-headless", { usingCoBrowserRoot }),
     playwrightSourceProfileDir:
       env.TIKTOK_SHARED_SOURCE_PROFILE_DIR ??
       env.TIKTOK_PLAYWRIGHT_SOURCE_PROFILE_DIR ??
-      path.join(
-        persistentBrowserRoot,
-        usingLocalRuntimeRoot ? "tiktok-monitor-profile-headed" : "shared-source-profile"
-      ),
+      defaultSourceProfileDir(persistentBrowserRoot, { usingCoBrowserRoot, usingLocalRuntimeRoot }),
     playwrightSeedProfileDir: env.TIKTOK_PLAYWRIGHT_SEED_PROFILE_DIR,
     chatgptPlaywrightRunProfileDir:
       env.CHATGPT_PLAYWRIGHT_RUN_PROFILE_DIR ??
-      path.join(
-        persistentBrowserRoot,
-        usingLocalRuntimeRoot ? "chatgpt-web-run-profile-headed" : "chatgpt-web-run-profile-headed"
-      ),
+      defaultRunProfileDir(persistentBrowserRoot, "chatgpt-web-run-profile-headed", { usingCoBrowserRoot }),
     playwrightHeadless: parseBoolean(env.TIKTOK_PLAYWRIGHT_HEADLESS, true),
     playwrightChannel: env.TIKTOK_PLAYWRIGHT_CHANNEL ?? "chrome",
     publicFirst: parseBoolean(env.TIKTOK_CHROME_PUBLIC_FIRST, true),
@@ -71,12 +63,31 @@ function parseBoolean(value, fallback) {
   return /^(1|true|yes)$/iu.test(String(value));
 }
 
-function defaultPersistentBrowserRoot({ homeDir = os.homedir() } = {}) {
+function defaultPersistentBrowserRoot({ homeDir = os.homedir(), env = process.env } = {}) {
+  const coBrowserRoot = env.COBROWSER_HOME ?? path.join(homeDir, ".codex-cobrowser");
+  if (env.COBROWSER_HOME) {
+    return coBrowserRoot;
+  }
+  if (fs.existsSync(coBrowserRoot)) {
+    return coBrowserRoot;
+  }
+
   const sharedRoot = path.join(homeDir, ".codex", "persistent-browser-profiles");
   if (fs.existsSync(sharedRoot)) {
     return sharedRoot;
   }
   return defaultLocalMonitorRuntimeRoot();
+}
+
+function defaultSourceProfileDir(rootDir, { usingCoBrowserRoot = false, usingLocalRuntimeRoot = false } = {}) {
+  if (usingCoBrowserRoot) {
+    return path.join(rootDir, "source-profile");
+  }
+  return path.join(rootDir, usingLocalRuntimeRoot ? "tiktok-monitor-profile-headed" : "shared-source-profile");
+}
+
+function defaultRunProfileDir(rootDir, runName, { usingCoBrowserRoot = false } = {}) {
+  return path.join(rootDir, usingCoBrowserRoot ? "run-profiles" : "", runName);
 }
 
 function defaultLocalMonitorRuntimeRoot() {
@@ -85,4 +96,8 @@ function defaultLocalMonitorRuntimeRoot() {
 
 function isLocalMonitorRuntimeRoot(rootDir) {
   return path.resolve(rootDir) === defaultLocalMonitorRuntimeRoot();
+}
+
+function isCoBrowserRoot(rootDir, { homeDir = os.homedir(), env = process.env } = {}) {
+  return path.resolve(rootDir) === path.resolve(env.COBROWSER_HOME ?? path.join(homeDir, ".codex-cobrowser"));
 }
