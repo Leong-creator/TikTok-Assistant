@@ -26,6 +26,23 @@ This repository also carries two local Codex plugin packages:
 - `plugins/cobrowser`: stable Playwright-backed Chrome operation with plugin-managed profiles.
 - `plugins/tiktok-monitor`: TikTok monitoring commands that use CoBrowser by default.
 
+Install on another Windows computer by giving Codex or another AI agent this repository URL:
+
+```text
+https://github.com/Leong-creator/TikTok-Assistant
+```
+
+Then ask it to install the TikTok Assistant plugins. The AI should follow `INSTALL.md`, or run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Leong-creator/TikTok-Assistant/main/scripts/install-plugins-from-github.ps1 | iex"
+```
+
+Manual release install links:
+
+- CoBrowser: https://github.com/Leong-creator/TikTok-Assistant/releases/tag/cobrowser-v0.1.1
+- TikTok monitor: https://github.com/Leong-creator/TikTok-Assistant/releases/tag/tiktok-monitor-v0.1.0
+
 The local marketplace entry is `.agents/plugins/marketplace.json`. Release packages are generated into ignored `dist/` folders and should be attached to GitHub Releases rather than committed.
 
 ```bash
