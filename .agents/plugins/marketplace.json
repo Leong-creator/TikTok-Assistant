@@ -1,0 +1,20 @@
+{
+  "name": "tiktok-monitor-local-marketplace",
+  "interface": {
+    "displayName": "TikTok Monitor Plugins"
+  },
+  "plugins": [
+    {
+      "name": "tiktok-monitor",
+      "source": {
+        "source": "local",
+        "path": "./plugins/tiktok-monitor"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Engineering"
+    }
+  ]
+}

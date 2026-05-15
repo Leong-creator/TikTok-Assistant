@@ -1,0 +1,45 @@
+{
+  "name": "tiktok-monitor",
+  "version": "0.1.0",
+  "description": "Portable TikTok monitoring plugin that runs the repository collector through CoBrowser and the monitor CLI.",
+  "author": {
+    "name": "Leong",
+    "email": "local@example.invalid",
+    "url": "https://local.invalid/tiktok-monitor"
+  },
+  "homepage": "https://local.invalid/tiktok-monitor",
+  "repository": "https://local.invalid/tiktok-monitor",
+  "license": "MIT",
+  "keywords": [
+    "tiktok",
+    "monitor",
+    "cobrowser",
+    "playwright",
+    "feishu"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "TikTok monitor",
+    "shortDescription": "Run TikTok monitoring cycles through CoBrowser",
+    "longDescription": "TikTok monitor wraps the repository monitor CLI so Codex can refresh collection plans, run CoBrowser-backed collection, analyze snapshots, sync Feishu Base, and send operator-facing reports with one command.",
+    "developerName": "Leong",
+    "category": "Engineering",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://local.invalid/tiktok-monitor",
+    "privacyPolicyURL": "https://local.invalid/tiktok-monitor/privacy",
+    "termsOfServiceURL": "https://local.invalid/tiktok-monitor/terms",
+    "defaultPrompt": [
+      "Use TikTok monitor to run one full monitoring cycle.",
+      "Use TikTok monitor to check collection status.",
+      "Use TikTok monitor setup to review first-time configuration."
+    ],
+    "brandColor": "#111827",
+    "composerIcon": "./assets/tiktok-monitor.svg",
+    "logo": "./assets/tiktok-monitor.svg",
+    "screenshots": []
+  }
+}
