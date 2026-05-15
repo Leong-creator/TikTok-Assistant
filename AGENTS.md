@@ -11,6 +11,14 @@ Complete the MVP without stopping at documentation only: a script must become a 
 - Do not commit generated media, account tokens, cookies, or temporary provider output.
 - Keep `outputs/` ignored unless the user explicitly asks to preserve a sample package in git.
 
+## Thread Routing
+
+- If `CODEX_THREAD_ID` matches a known long-running project thread, continue in the corresponding branch/worktree before making edits. The source of truth is `docs/thread-routing.md`.
+- `019e0c97-3cc0-7123-b12c-c0fb03202134` is TikTok monitoring and should use branch `codex/thread-tiktok-monitor`.
+- `019e086a-4d18-7262-9ba3-0432468371c2` is content production / GPT image workflow and should use branch `codex/thread-content-production`.
+- `019e0d06-45b2-70b1-9db4-42a5a885bcea` is CoBrowser / browser runtime and should use branch `codex/thread-browser-runtime`.
+- If the current shell is in an old temporary worktree such as `TikTok Project Monitor` or `__tmp_*`, stop using that path for new edits. Run `powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\EDY\Desktop\TikTok Project\scripts\route-thread.ps1"` and use the returned worktree path for subsequent commands.
+
 ## Generation Boundaries
 
 - MVP output is a local folder for manual CapCut import.
@@ -22,7 +30,7 @@ Complete the MVP without stopping at documentation only: a script must become a 
 
 - Before adding scripts, browser workarounds, or provider glue, check and reuse the most mature existing capability available in this order: existing project modules, official CLIs, enabled Codex plugins, installed skills, and documented provider APIs.
 - Do not rebuild features already covered by `dreamina` CLI, `lark-cli`, `playwright-persistent` runtimes, `download-collector`, provider queues, retry commands, manifest writers, or package index writers.
-- For TikTok monitor/background collection, use the repository's CoBrowser-backed formal command as the default browser path: `node src/monitor-cli.mjs monitor-cycle --source cobrowser --data-dir monitoring_data` in the monitor worktree, or the portable wrapper `node C:/Users/EDY/plugins/tiktok-monitor/scripts/tiktok-monitor.mjs cycle`.
+- For TikTok monitor/background collection, use the repository's CoBrowser-backed formal command as the default browser path: `node src/monitor-cli.mjs monitor-cycle --source cobrowser --data-dir monitoring_data` in the assigned project worktree, or the portable wrapper `node C:/Users/EDY/plugins/tiktok-monitor/scripts/tiktok-monitor.mjs cycle`.
 - That collector must follow the OpenClaw browser pattern from `C:/Users/EDY/Desktop/Codex-claw/openclaw-workspace`: source-profile clone -> automation-owned profile -> `chromium.launchPersistentContext(..., { channel: "chrome" })` -> dedicated page workflow -> close only the automation-owned context.
 - For ChatGPT web image generation, review, and download in the content pipeline, use a headed `playwright-persistent` run profile that clones from the same shared source profile as TikTok monitoring.
 - Do not introduce a third browser path unless both the persistent browser path and the explicit fallback path have been proven unsuitable for the task and the failure has been recorded.

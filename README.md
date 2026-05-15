@@ -51,6 +51,10 @@ npm run plugin:tiktok-monitor:build
 npm run plugin:tiktok-monitor:package
 ```
 
+## Codex Thread Routes
+
+Long-running Codex conversations are mapped to dedicated branches/worktrees in `docs/thread-routing.md`. Use `scripts/route-thread.ps1` when reopening an old monitoring, content-production, or browser-runtime conversation.
+
 ## Quick Start
 
 Run tests:
