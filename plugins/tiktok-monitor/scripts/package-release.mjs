@@ -12,7 +12,6 @@ const version = manifest.version || "0.1.0";
 const releaseRoot = path.join(repoRoot, "dist", "plugin-releases");
 const packageDir = path.join(releaseRoot, `tiktok-monitor-${version}`);
 const zipPath = path.join(releaseRoot, `tiktok-monitor-${version}.zip`);
-const repoMarketplacePath = path.join(repoRoot, ".agents", "plugins", "marketplace.json");
 const buildScriptPath = path.join(scriptDir, "build-bundle.mjs");
 
 await runNodeScript(buildScriptPath);
@@ -25,7 +24,11 @@ await fs.cp(pluginRoot, path.join(packageDir, "plugins", "tiktok-monitor"), {
   recursive: true,
   force: true
 });
-await fs.copyFile(repoMarketplacePath, path.join(packageDir, ".agents", "plugins", "marketplace.json"));
+await fs.writeFile(
+  path.join(packageDir, ".agents", "plugins", "marketplace.json"),
+  `${JSON.stringify(buildPackageMarketplace(), null, 2)}\n`,
+  "utf8"
+);
 await fs.writeFile(path.join(packageDir, "install.ps1"), buildInstallerScript(), "utf8");
 await fs.writeFile(path.join(packageDir, "INSTALL.md"), buildInstallGuide(version), "utf8");
 
@@ -107,6 +110,29 @@ Write-Host "Marketplace: $MarketplaceTarget"
 Write-Host "Codex config: $CodexConfig"
 Write-Host 'Next: refresh or reopen the Codex plugin page, then run node scripts/setup.mjs in the plugin folder once.'
 `.trimStart();
+}
+
+function buildPackageMarketplace() {
+  return {
+    name: "tiktok-monitor-local-marketplace",
+    interface: {
+      displayName: "TikTok Monitor Plugin"
+    },
+    plugins: [
+      {
+        name: "tiktok-monitor",
+        source: {
+          source: "local",
+          path: "./plugins/tiktok-monitor"
+        },
+        policy: {
+          installation: "AVAILABLE",
+          authentication: "ON_INSTALL"
+        },
+        category: "Engineering"
+      }
+    ]
+  };
 }
 
 function buildInstallGuide(versionText) {
