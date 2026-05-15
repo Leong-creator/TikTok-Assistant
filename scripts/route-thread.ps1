@@ -15,6 +15,12 @@ $Routes = @(
     Branch = "codex/thread-tiktok-monitor"
     WorktreePath = (Join-Path $RepoRoot ".worktrees\thread-tiktok-monitor")
     Task = "TikTok monitoring, monitor plugin operation, collection context, Feishu/Base reports"
+    LocalLinks = @(
+      [pscustomobject]@{
+        RelativePath = "monitoring_data"
+        Target = (Join-Path $RepoRoot "monitoring_data")
+      }
+    )
   },
   [pscustomobject]@{
     ThreadId = "019e086a-4d18-7262-9ba3-0432468371c2"
@@ -22,6 +28,16 @@ $Routes = @(
     Branch = "codex/thread-content-production"
     WorktreePath = (Join-Path $RepoRoot ".worktrees\thread-content-production")
     Task = "Content production, script workflow, GPT image prompts, private GPT and visual review rules"
+    LocalLinks = @(
+      [pscustomobject]@{
+        RelativePath = "outputs"
+        Target = (Join-Path $RepoRoot "outputs")
+      },
+      [pscustomobject]@{
+        RelativePath = ".runtime"
+        Target = (Join-Path $RepoRoot ".runtime")
+      }
+    )
   },
   [pscustomobject]@{
     ThreadId = "019e0d06-45b2-70b1-9db4-42a5a885bcea"
@@ -29,6 +45,12 @@ $Routes = @(
     Branch = "codex/thread-browser-runtime"
     WorktreePath = (Join-Path $RepoRoot ".worktrees\thread-browser-runtime")
     Task = "CoBrowser, shared source profile, ChatGPT/TikTok browser runtime, plugin packaging support"
+    LocalLinks = @(
+      [pscustomobject]@{
+        RelativePath = ".runtime"
+        Target = (Join-Path $RepoRoot ".runtime")
+      }
+    )
   }
 )
 
@@ -80,6 +102,23 @@ if ($CurrentBranch -ne $Route.Branch) {
   throw "Worktree $($Route.WorktreePath) is on $CurrentBranch, expected $($Route.Branch)."
 }
 
+$ResolvedLinks = @()
+foreach ($LocalLink in $Route.LocalLinks) {
+  if (-not (Test-Path -LiteralPath $LocalLink.Target)) {
+    New-Item -ItemType Directory -Path $LocalLink.Target | Out-Null
+  }
+
+  $LinkPath = Join-Path $Route.WorktreePath $LocalLink.RelativePath
+  if (-not (Test-Path -LiteralPath $LinkPath)) {
+    New-Item -ItemType Junction -Path $LinkPath -Target $LocalLink.Target | Out-Null
+  }
+
+  $ResolvedLinks += [pscustomobject]@{
+    path = $LinkPath
+    target = $LocalLink.Target
+  }
+}
+
 [pscustomobject]@{
   ready = $true
   threadId = $Route.ThreadId
@@ -88,5 +127,6 @@ if ($CurrentBranch -ne $Route.Branch) {
   branch = $Route.Branch
   worktreePath = $Route.WorktreePath
   currentBranch = $CurrentBranch
+  localLinks = $ResolvedLinks
   nextCommand = "Set-Location -LiteralPath `"$($Route.WorktreePath)`""
 } | ConvertTo-Json -Depth 4

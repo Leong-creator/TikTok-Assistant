@@ -30,6 +30,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\EDY\Desktop\TikTok
 
 The script prints the target branch and worktree. If the worktree is missing, it recreates it from the matching branch.
 
+## Local Data Links
+
+The thread worktrees are Git checkouts, so ignored operational folders do not appear there automatically. The helper creates local directory junctions for the folders that must remain shared:
+
+| Worktree | Local link | Target |
+| --- | --- | --- |
+| `thread-tiktok-monitor` | `monitoring_data` | `C:\Users\EDY\Desktop\TikTok Project\monitoring_data` |
+| `thread-content-production` | `outputs` | `C:\Users\EDY\Desktop\TikTok Project\outputs` |
+| `thread-content-production` | `.runtime` | `C:\Users\EDY\Desktop\TikTok Project\.runtime` |
+| `thread-browser-runtime` | `.runtime` | `C:\Users\EDY\Desktop\TikTok Project\.runtime` |
+
+Do not commit these links or the linked folder contents.
+
 ## Handoff Prompts
 
 If Codex opens an old conversation in the wrong directory, send one of these once.
