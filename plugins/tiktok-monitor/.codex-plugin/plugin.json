@@ -4,11 +4,11 @@
   "description": "Portable TikTok monitoring plugin that runs the repository collector through CoBrowser and the monitor CLI.",
   "author": {
     "name": "Leong",
-    "email": "local@example.invalid",
-    "url": "https://local.invalid/tiktok-monitor"
+    "email": "Leong-creator@users.noreply.github.com",
+    "url": "https://github.com/Leong-creator/TikTok-Assistant/tree/main/plugins/tiktok-monitor"
   },
-  "homepage": "https://local.invalid/tiktok-monitor",
-  "repository": "https://local.invalid/tiktok-monitor",
+  "homepage": "https://github.com/Leong-creator/TikTok-Assistant/tree/main/plugins/tiktok-monitor",
+  "repository": "https://github.com/Leong-creator/TikTok-Assistant",
   "license": "MIT",
   "keywords": [
     "tiktok",
@@ -29,9 +29,9 @@
       "Read",
       "Write"
     ],
-    "websiteURL": "https://local.invalid/tiktok-monitor",
-    "privacyPolicyURL": "https://local.invalid/tiktok-monitor/privacy",
-    "termsOfServiceURL": "https://local.invalid/tiktok-monitor/terms",
+    "websiteURL": "https://github.com/Leong-creator/TikTok-Assistant/tree/main/plugins/tiktok-monitor",
+    "privacyPolicyURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/privacy.md",
+    "termsOfServiceURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/terms.md",
     "defaultPrompt": [
       "Use TikTok monitor to run one full monitoring cycle.",
       "Use TikTok monitor to check collection status.",

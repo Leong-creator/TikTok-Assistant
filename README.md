@@ -19,6 +19,21 @@ For business 钩子, a calm accurate scene can still fail if the reference-level
 If ChatGPT returns multiple independent images displayed as a grid of thumbnails, review them individually as batch output. If it returns one image that contains a multi-panel grid/storyboard, treat it as preview-only and regenerate accepted cells as standalone 9:16 images before Dreamina image-to-video.
 Image prompts should not reserve blank subtitle space. Captions are added over the image in CapCut, so assets should stay full-frame and visually complete.
 
+## Plugins
+
+This repository also carries two local Codex plugin packages:
+
+- `plugins/cobrowser`: stable Playwright-backed Chrome operation with plugin-managed profiles.
+- `plugins/tiktok-monitor`: TikTok monitoring commands that use CoBrowser by default.
+
+The local marketplace entry is `.agents/plugins/marketplace.json`. Release packages are generated into ignored `dist/` folders and should be attached to GitHub Releases rather than committed.
+
+```bash
+npm run plugin:cobrowser:package
+npm run plugin:tiktok-monitor:build
+npm run plugin:tiktok-monitor:package
+```
+
 ## Quick Start
 
 Run tests:

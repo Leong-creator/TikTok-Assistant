@@ -1,0 +1,45 @@
+{
+  "name": "cobrowser",
+  "version": "0.1.1",
+  "description": "Stable Playwright-based browser operation for Codex using plugin-managed Chrome profiles.",
+  "author": {
+    "name": "Leong",
+    "email": "Leong-creator@users.noreply.github.com",
+    "url": "https://github.com/Leong-creator/TikTok-Assistant/tree/main/plugins/cobrowser"
+  },
+  "homepage": "https://github.com/Leong-creator/TikTok-Assistant/tree/main/plugins/cobrowser",
+  "repository": "https://github.com/Leong-creator/TikTok-Assistant",
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "playwright",
+    "chrome",
+    "automation",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "CoBrowser",
+    "shortDescription": "Operate real Chrome sessions from Codex",
+    "longDescription": "CoBrowser gives Codex a stable browser operation layer built on Playwright persistent Chrome contexts. It manages isolated browser profiles, standard page actions, screenshots, downloads, and diagnostics without relying on the Codex Chrome extension.",
+    "developerName": "Leong",
+    "category": "Engineering",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/Leong-creator/TikTok-Assistant/tree/main/plugins/cobrowser",
+    "privacyPolicyURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/privacy.md",
+    "termsOfServiceURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/terms.md",
+    "defaultPrompt": [
+      "Use CoBrowser headed to inspect this page.",
+      "Use CoBrowser headless to read this URL.",
+      "Use CoBrowser headed and take a screenshot."
+    ],
+    "brandColor": "#0F766E",
+    "composerIcon": "./assets/cobrowser.svg",
+    "logo": "./assets/cobrowser.svg",
+    "screenshots": []
+  }
+}

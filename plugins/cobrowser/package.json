@@ -1,0 +1,24 @@
+{
+  "name": "codex-cobrowser",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "description": "CoBrowser Codex plugin for stable Playwright-backed Chrome operation.",
+  "author": "Leong",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "cobrowser": "./scripts/cobrowser.mjs"
+  },
+  "scripts": {
+    "setup": "node scripts/cobrowser.mjs setup",
+    "doctor": "node scripts/cobrowser.mjs doctor --launch true --mode headless",
+    "smoke": "node scripts/cobrowser.mjs smoke-test --mode headless",
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}

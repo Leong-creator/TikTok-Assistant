@@ -1,9 +1,21 @@
 {
-  "name": "tiktok-monitor-local-marketplace",
+  "name": "tiktok-assistant-plugin-marketplace",
   "interface": {
-    "displayName": "TikTok Monitor Plugins"
+    "displayName": "TikTok Assistant Plugins"
   },
   "plugins": [
+    {
+      "name": "cobrowser",
+      "source": {
+        "source": "local",
+        "path": "./plugins/cobrowser"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Engineering"
+    },
     {
       "name": "tiktok-monitor",
       "source": {
