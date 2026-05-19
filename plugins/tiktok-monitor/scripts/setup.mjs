@@ -13,8 +13,8 @@ const configuredDataDir = process.env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_dat
 const dataDir = path.isAbsolute(configuredDataDir)
   ? configuredDataDir
   : path.join(repoRoot, configuredDataDir);
-const cobrowserSourceProfile = path.join(
-  process.env.COBROWSER_ROOT_DIR ?? path.join(os.homedir(), ".codex-cobrowser"),
+const cloakbrowserSourceProfile = path.join(
+  process.env.CLOAKBROWSER_HOME ?? path.join(os.homedir(), ".codex-cloakbrowser"),
   "source-profile"
 );
 
@@ -30,9 +30,9 @@ const checks = [
     detail: repoRoot
   },
   {
-    name: "cobrowserSourceProfile",
-    ok: fs.existsSync(cobrowserSourceProfile),
-    detail: cobrowserSourceProfile
+    name: "cloakbrowserSourceProfile",
+    ok: fs.existsSync(cloakbrowserSourceProfile),
+    detail: cloakbrowserSourceProfile
   },
   {
     name: "alertConfig",
@@ -54,7 +54,7 @@ console.log(JSON.stringify({
   checks,
   nextSteps: [
     "If bundledRuntime is missing, run node scripts/build-bundle.mjs before publishing or installing the plugin elsewhere.",
-    "If cobrowserSourceProfile is missing or empty, open CoBrowser headed and log in to TikTok once.",
+    "If cloakbrowserSourceProfile is missing or empty, run CloakBrowser login once and complete TikTok sign-in.",
     "If alertConfig is missing, create monitoring_data/alert_config.json with {\"dmOpenId\":\"<your_open_id>\"}.",
     "If baseDashboardConfig is missing, copy the example template into monitoring_data and fill in the real table IDs.",
     "For local installation, run node scripts/install-local.mjs after the bundle is built."

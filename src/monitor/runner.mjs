@@ -3,6 +3,7 @@ import path from "node:path";
 import { createAlertRecord, buildFeishuAlertText, createFeishuNotifier, dedupeAlertSignals } from "./alerts.mjs";
 import { analyzeProductSnapshots, analyzeVideoSnapshots, selectCollectionTargets } from "./analyzer.mjs";
 import { collectChromeSnapshots } from "./chrome-source.mjs";
+import { collectCloakBrowserSnapshots } from "./cloakbrowser-source.mjs";
 import { collectCoBrowserSnapshots } from "./cobrowser-source.mjs";
 import { collectMockSnapshots } from "./mock-source.mjs";
 import { collectPlaywrightPersistentSnapshots } from "./playwright-persistent-source.mjs";
@@ -290,6 +291,9 @@ async function collectSnapshots(options) {
   }
   if (options.source === "playwright-persistent") {
     return (options.config?.collectPlaywrightPersistentSnapshots ?? collectPlaywrightPersistentSnapshots)(options);
+  }
+  if (options.source === "cloakbrowser") {
+    return (options.config?.collectCloakBrowserSnapshots ?? collectCloakBrowserSnapshots)(options);
   }
   if (options.source === "cobrowser") {
     return (options.config?.collectCoBrowserSnapshots ?? collectCoBrowserSnapshots)(options);

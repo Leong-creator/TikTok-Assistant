@@ -176,6 +176,55 @@ test("playwright browser client times out hung snapshots with the chrome-style e
   );
 });
 
+test("playwright browser client can apply humanized pauses and scrolling without changing parser results", async () => {
+  const page = createFakePlaywrightPage({
+    snapshotSequenceByUrl: new Map([
+      [
+        "https://www.tiktok.com/@book_seller/video/735111",
+        "Caption: Public book video\n9.5K views\n800 likes\n31 comments\n12 shares"
+      ]
+    ])
+  });
+  page.mouse = {
+    wheelCalls: [],
+    async wheel(x, y) {
+      this.wheelCalls.push({ x, y });
+    }
+  };
+
+  const client = createPlaywrightBrowserClient({
+    context: {
+      async newPage() {
+        return page;
+      },
+      pages() {
+        return [page];
+      }
+    },
+    humanize: true,
+    postNavigateDelayMinMs: 0,
+    postNavigateDelayMaxMs: 0,
+    preSnapshotDelayMinMs: 0,
+    preSnapshotDelayMaxMs: 0,
+    preSnapshotScrollMinY: 120,
+    preSnapshotScrollMaxY: 120
+  });
+
+  const tab = await client.createTab();
+  await client.navigate(tab, "https://www.tiktok.com/@book_seller/video/735111");
+  const result = await client.extractDirectVideo({
+    detailTab: tab,
+    video: {
+      videoUrl: "https://www.tiktok.com/@book_seller/video/735111",
+      accountHandle: "book_seller"
+    }
+  });
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.video.views, 9500);
+  assert.deepEqual(page.mouse.wheelCalls, [{ x: 0, y: 120 }]);
+});
+
 function createFakePlaywrightPage({ snapshotSequenceByUrl }) {
   const snapshotReadsByUrl = new Map();
   return {

@@ -10,10 +10,32 @@ const bundledCliPath = path.join(pluginRoot, "dist", "runtime", "monitor-cli.mjs
 
 export function mapCommand(name, monitorDataDir) {
   if (name === "cycle") {
-    return ["monitor-cycle", "--source", "cobrowser", "--data-dir", monitorDataDir];
+    return [
+      "monitor-cycle",
+      "--source",
+      "cloakbrowser",
+      "--data-dir",
+      monitorDataDir,
+      "--max-tabs",
+      "1",
+      "--max-seed-videos",
+      "1",
+      "--max-accounts",
+      "1"
+    ];
   }
   if (name === "collect-batch") {
-    return ["collect-cobrowser-batch", "--data-dir", monitorDataDir];
+    return [
+      "collect-cloakbrowser-batch",
+      "--data-dir",
+      monitorDataDir,
+      "--max-tabs",
+      "1",
+      "--max-seed-videos",
+      "1",
+      "--max-accounts",
+      "1"
+    ];
   }
   if (name === "status") {
     return ["collect-status", "--data-dir", monitorDataDir];

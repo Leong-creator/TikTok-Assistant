@@ -19,8 +19,9 @@ test("resolveMonitorConfig includes Chrome plugin batch limits", () => {
 test("resolveMonitorConfig defaults account monitoring to high coverage and three-hour thresholds", () => {
   const config = resolveMonitorConfig({});
 
-  assert.equal(config.source, "cobrowser");
+  assert.equal(config.source, "cloakbrowser");
   assert.equal(config.maxVideosPerAccount, 60);
+  assert.equal(config.maxTabs, 1);
   assert.equal(config.collectionIntervalHours, 3);
   assert.equal(config.min3hViews, 3000);
   assert.equal(config.min3hLikes, 3000);
@@ -79,7 +80,7 @@ test("resolveMonitorConfig falls back to the local monitor runtime profile when 
 
   try {
     const config = resolveMonitorConfig({});
-    assert.match(config.persistentBrowserRoot, /TikTok Project[\\/]\.runtime[\\/]browser$/u);
+    assert.match(config.persistentBrowserRoot, /TikTok Project(?:[\\/]\.worktrees[\\/][^\\/]+)?[\\/]\.runtime[\\/]browser$/u);
     assert.match(config.playwrightSourceProfileDir, /tiktok-monitor-profile-headed$/u);
     assert.match(config.playwrightProfileDir, /tiktok-monitor-run-profile-headless$/u);
   } finally {
@@ -101,4 +102,30 @@ test("resolveMonitorConfig exposes CoBrowser defaults", () => {
   assert.equal(config.cobrowserHeadless, false);
   assert.equal(config.cobrowserProfile, "named-headless");
   assert.equal(config.cobrowserFresh, false);
+});
+
+test("resolveMonitorConfig exposes CloakBrowser defaults", () => {
+  const config = resolveMonitorConfig({
+    TIKTOK_CLOAKBROWSER_RUN_PROFILE_DIR: "profiles/cloak/run",
+    TIKTOK_CLOAKBROWSER_SOURCE_PROFILE_DIR: "profiles/cloak/source",
+    TIKTOK_CLOAKBROWSER_SEED_PROFILE_DIR: "profiles/cloak/seed",
+    TIKTOK_CLOAKBROWSER_HEADLESS: "false",
+    TIKTOK_CLOAKBROWSER_FRESH: "false",
+    TIKTOK_CLOAKBROWSER_HUMANIZE: "true",
+    TIKTOK_CLOAKBROWSER_HUMAN_PRESET: "slow",
+    TIKTOK_CLOAKBROWSER_LOCALE: "en-US",
+    TIKTOK_CLOAKBROWSER_TIMEZONE: "America/New_York",
+    TIKTOK_CLOAKBROWSER_PROXY: "http://127.0.0.1:8000"
+  });
+
+  assert.equal(config.cloakbrowserProfileDir, "profiles/cloak/run");
+  assert.equal(config.cloakbrowserSourceProfileDir, "profiles/cloak/source");
+  assert.equal(config.cloakbrowserSeedProfileDir, "profiles/cloak/seed");
+  assert.equal(config.cloakbrowserHeadless, false);
+  assert.equal(config.cloakbrowserFresh, false);
+  assert.equal(config.cloakbrowserHumanize, true);
+  assert.equal(config.cloakbrowserHumanPreset, "slow");
+  assert.equal(config.cloakbrowserLocale, "en-US");
+  assert.equal(config.cloakbrowserTimezone, "America/New_York");
+  assert.equal(config.cloakbrowserProxy, "http://127.0.0.1:8000");
 });

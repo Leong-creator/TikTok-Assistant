@@ -14,11 +14,30 @@ export function createPlaywrightBrowserClient({
   snapshotRetries = 8,
   snapshotRetryDelayMs = 1_000,
   maxVideosPerAccount = 6,
-  maxProductsPerShop = 6
+  maxProductsPerShop = 6,
+  humanize = false,
+  humanPreset = "careful",
+  postNavigateDelayMinMs,
+  postNavigateDelayMaxMs,
+  preSnapshotDelayMinMs,
+  preSnapshotDelayMaxMs,
+  preSnapshotScrollMinY,
+  preSnapshotScrollMaxY
 } = {}) {
   if (!context?.newPage) {
     throw new Error("playwright_context_unavailable: context.newPage is required");
   }
+
+  const humanizedSettings = resolveHumanizedSettings({
+    enabled: humanize,
+    humanPreset,
+    postNavigateDelayMinMs,
+    postNavigateDelayMaxMs,
+    preSnapshotDelayMinMs,
+    preSnapshotDelayMaxMs,
+    preSnapshotScrollMinY,
+    preSnapshotScrollMaxY
+  });
 
   const client = {
     usesDetailTab: true,
@@ -31,6 +50,7 @@ export function createPlaywrightBrowserClient({
     async navigate(tab, url) {
       await withTimeout(tab.goto(url), timeoutMs, `goto ${url}`);
       await tab.playwright.waitForLoadState({ state: waitUntil, timeoutMs }).catch(() => {});
+      await applyPostNavigateHumanization(tab, humanizedSettings);
     },
     async extractAccountVideos({ listTab, detailTab, account }) {
       const listResult = await readParsedSnapshot(listTab, (snapshot) => {
@@ -45,7 +65,8 @@ export function createPlaywrightBrowserClient({
       }, {
         retries: snapshotRetries,
         retryDelayMs: snapshotRetryDelayMs,
-        snapshotTimeoutMs
+        snapshotTimeoutMs,
+        beforeSnapshot: (attempt) => applyPreSnapshotHumanization(listTab, humanizedSettings, attempt)
       });
       if (listResult.status !== "ok") return listResult;
 
@@ -62,6 +83,7 @@ export function createPlaywrightBrowserClient({
           retries: snapshotRetries,
           retryDelayMs: snapshotRetryDelayMs,
           snapshotTimeoutMs,
+          beforeSnapshot: (attempt) => applyPreSnapshotHumanization(readTab, humanizedSettings, attempt),
           shouldRetry: shouldRetryVideoMetrics
         });
         if (detail.status === "ok") {
@@ -88,6 +110,7 @@ export function createPlaywrightBrowserClient({
         retries: snapshotRetries,
         retryDelayMs: snapshotRetryDelayMs,
         snapshotTimeoutMs,
+        beforeSnapshot: (attempt) => applyPreSnapshotHumanization(detailTab, humanizedSettings, attempt),
         shouldRetry: shouldRetryVideoMetrics
       });
     },
@@ -96,6 +119,7 @@ export function createPlaywrightBrowserClient({
         retries: snapshotRetries,
         retryDelayMs: snapshotRetryDelayMs,
         snapshotTimeoutMs,
+        beforeSnapshot: (attempt) => applyPreSnapshotHumanization(listTab, humanizedSettings, attempt),
         shouldRetry: shouldRetrySearchResults
       });
     },
@@ -108,6 +132,7 @@ export function createPlaywrightBrowserClient({
         retries: snapshotRetries,
         retryDelayMs: snapshotRetryDelayMs,
         snapshotTimeoutMs,
+        beforeSnapshot: (attempt) => applyPreSnapshotHumanization(profileTab, humanizedSettings, attempt),
         shouldRetry: shouldRetryProfileRefs
       });
     },
@@ -119,6 +144,7 @@ export function createPlaywrightBrowserClient({
         retries: snapshotRetries,
         retryDelayMs: snapshotRetryDelayMs,
         snapshotTimeoutMs,
+        beforeSnapshot: (attempt) => applyPreSnapshotHumanization(profileTab, humanizedSettings, attempt),
         shouldRetry: shouldRetryProfileVideos
       });
     },
@@ -130,7 +156,8 @@ export function createPlaywrightBrowserClient({
       }), {
         retries: snapshotRetries,
         retryDelayMs: snapshotRetryDelayMs,
-        snapshotTimeoutMs
+        snapshotTimeoutMs,
+        beforeSnapshot: (attempt) => applyPreSnapshotHumanization(listTab, humanizedSettings, attempt)
       });
     }
   };
@@ -146,6 +173,17 @@ function wrapPage(page) {
     },
     get currentUrl() {
       return page.url;
+    },
+    async scrollBy(y = 0) {
+      const deltaY = Number(y);
+      if (!Number.isFinite(deltaY) || deltaY === 0) return;
+      if (page.mouse?.wheel) {
+        await page.mouse.wheel(0, deltaY);
+        return;
+      }
+      if (page.evaluate) {
+        await page.evaluate((value) => window.scrollBy(0, value), deltaY);
+      }
     },
     playwright: {
       async domSnapshot() {
@@ -168,10 +206,11 @@ function wrapPage(page) {
 async function readParsedSnapshot(
   tab,
   parse,
-  { retries, retryDelayMs, snapshotTimeoutMs, shouldRetry = shouldRetryMissingMetrics }
+  { retries, retryDelayMs, snapshotTimeoutMs, shouldRetry = shouldRetryMissingMetrics, beforeSnapshot }
 ) {
   let latest = { status: "missing_metrics", reason: "public page did not expose data" };
   for (let attempt = 0; attempt <= retries; attempt += 1) {
+    if (beforeSnapshot) await beforeSnapshot(attempt);
     latest = parse(await withTimeout(tab.playwright.domSnapshot(), snapshotTimeoutMs, "domSnapshot"));
     if (!shouldRetry(latest)) return latest;
     if (attempt < retries) await delay(retryDelayMs);
@@ -212,6 +251,69 @@ function getTabCurrentUrl(tab) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveHumanizedSettings({
+  enabled,
+  humanPreset,
+  postNavigateDelayMinMs,
+  postNavigateDelayMaxMs,
+  preSnapshotDelayMinMs,
+  preSnapshotDelayMaxMs,
+  preSnapshotScrollMinY,
+  preSnapshotScrollMaxY
+}) {
+  const presetDefaults = humanPreset === "slow"
+    ? {
+        postNavigateDelayMinMs: 1800,
+        postNavigateDelayMaxMs: 3600,
+        preSnapshotDelayMinMs: 1200,
+        preSnapshotDelayMaxMs: 2400,
+        preSnapshotScrollMinY: 320,
+        preSnapshotScrollMaxY: 920
+      }
+    : {
+        postNavigateDelayMinMs: 1200,
+        postNavigateDelayMaxMs: 2600,
+        preSnapshotDelayMinMs: 900,
+        preSnapshotDelayMaxMs: 1800,
+        preSnapshotScrollMinY: 240,
+        preSnapshotScrollMaxY: 720
+      };
+  return {
+    enabled: Boolean(enabled),
+    postNavigateDelayMinMs: numberOr(postNavigateDelayMinMs, presetDefaults.postNavigateDelayMinMs),
+    postNavigateDelayMaxMs: numberOr(postNavigateDelayMaxMs, presetDefaults.postNavigateDelayMaxMs),
+    preSnapshotDelayMinMs: numberOr(preSnapshotDelayMinMs, presetDefaults.preSnapshotDelayMinMs),
+    preSnapshotDelayMaxMs: numberOr(preSnapshotDelayMaxMs, presetDefaults.preSnapshotDelayMaxMs),
+    preSnapshotScrollMinY: numberOr(preSnapshotScrollMinY, presetDefaults.preSnapshotScrollMinY),
+    preSnapshotScrollMaxY: numberOr(preSnapshotScrollMaxY, presetDefaults.preSnapshotScrollMaxY)
+  };
+}
+
+async function applyPostNavigateHumanization(tab, settings) {
+  if (!settings.enabled) return;
+  await delay(randomBetween(settings.postNavigateDelayMinMs, settings.postNavigateDelayMaxMs));
+}
+
+async function applyPreSnapshotHumanization(tab, settings, attempt) {
+  if (!settings.enabled) return;
+  if (attempt === 0) {
+    await tab.scrollBy?.(randomBetween(settings.preSnapshotScrollMinY, settings.preSnapshotScrollMaxY));
+  }
+  await delay(randomBetween(settings.preSnapshotDelayMinMs, settings.preSnapshotDelayMaxMs));
+}
+
+function randomBetween(min, max) {
+  const lower = numberOr(min, 0);
+  const upper = numberOr(max, lower);
+  if (upper <= lower) return lower;
+  return Math.floor(lower + Math.random() * (upper - lower + 1));
+}
+
+function numberOr(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
 }
 
 function withTimeout(promise, timeoutMs, operationName) {

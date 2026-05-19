@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { createFeishuNotifier } from "./alerts.mjs";
 import { syncFeishuBaseDashboard } from "./base-dashboard.mjs";
+import { runCloakBrowserMonitorBatch } from "./cloakbrowser-runner.mjs";
 import { runCoBrowserMonitorBatch } from "./cobrowser-runner.mjs";
 import { sendMonitorReport } from "./reporting.mjs";
 import { analyzeMonitorData } from "./runner.mjs";
@@ -11,7 +12,7 @@ import { runPlaywrightPersistentMonitorBatch } from "./playwright-persistent-run
 export async function runMonitorCycle({
   dataDir = "monitoring_data",
   now = new Date(),
-  source = "cobrowser",
+  source = "cloakbrowser",
   config = {},
   alertMode = "dm",
   alertRecipient,
@@ -78,6 +79,9 @@ export async function runMonitorCycle({
 }
 
 async function runMonitorBatch({ source, dataDir, now, config, refreshPlan }) {
+  if (source === "cloakbrowser") {
+    return (config.runCloakBrowserMonitorBatch ?? runCloakBrowserMonitorBatch)({ dataDir, now, config, refreshPlan });
+  }
   if (source === "cobrowser") {
     return (config.runCoBrowserMonitorBatch ?? runCoBrowserMonitorBatch)({ dataDir, now, config, refreshPlan });
   }

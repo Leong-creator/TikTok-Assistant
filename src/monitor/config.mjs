@@ -9,9 +9,9 @@ export function resolveMonitorConfig(env = process.env) {
   const usingCoBrowserRoot = isCoBrowserRoot(persistentBrowserRoot, { env });
   return {
     dataDir: env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_data",
-    source: env.TIKTOK_MONITOR_SOURCE ?? "cobrowser",
+    source: env.TIKTOK_MONITOR_SOURCE ?? "cloakbrowser",
     targets: parseTargets(env.TIKTOK_MONITOR_TARGETS ?? "accounts,shops,videos"),
-    maxTabs: Number(env.TIKTOK_CHROME_MAX_TABS ?? 2),
+    maxTabs: Number(env.TIKTOK_CHROME_MAX_TABS ?? 1),
     collectionIntervalHours: Number(env.TIKTOK_MONITOR_COLLECTION_INTERVAL_HOURS ?? 3),
     maxVideosPerAccount: Number(env.TIKTOK_CHROME_MAX_VIDEOS_PER_ACCOUNT ?? 60),
     maxProductsPerShop: Number(env.TIKTOK_CHROME_MAX_PRODUCTS_PER_SHOP ?? 6),
@@ -47,7 +47,31 @@ export function resolveMonitorConfig(env = process.env) {
     cobrowserRuntimeModule: env.COBROWSER_RUNTIME_MODULE,
     cobrowserHeadless: parseBoolean(env.COBROWSER_HEADLESS, true),
     cobrowserProfile: env.COBROWSER_PROFILE,
-    cobrowserFresh: parseBoolean(env.COBROWSER_FRESH, true)
+    cobrowserFresh: parseBoolean(env.COBROWSER_FRESH, true),
+    cloakbrowserProfileDir:
+      env.TIKTOK_CLOAKBROWSER_RUN_PROFILE_DIR ??
+      defaultRunProfileDir(persistentBrowserRoot, "tiktok-monitor-run-profile-headless-cloak", {
+        usingCoBrowserRoot
+      }),
+    cloakbrowserRuntimeModule: env.CLOAKBROWSER_MODULE,
+    cloakbrowserSourceProfileDir:
+      env.TIKTOK_CLOAKBROWSER_SOURCE_PROFILE_DIR ??
+      env.TIKTOK_SHARED_SOURCE_PROFILE_DIR ??
+      defaultSourceProfileDir(persistentBrowserRoot, { usingCoBrowserRoot, usingLocalRuntimeRoot }),
+    cloakbrowserSeedProfileDir: env.TIKTOK_CLOAKBROWSER_SEED_PROFILE_DIR,
+    cloakbrowserHeadless: parseBoolean(env.TIKTOK_CLOAKBROWSER_HEADLESS, true),
+    cloakbrowserFresh: parseBoolean(env.TIKTOK_CLOAKBROWSER_FRESH, true),
+    cloakbrowserHumanize: parseBoolean(env.TIKTOK_CLOAKBROWSER_HUMANIZE, true),
+    cloakbrowserHumanPreset: env.TIKTOK_CLOAKBROWSER_HUMAN_PRESET ?? "careful",
+    cloakbrowserLocale: env.TIKTOK_CLOAKBROWSER_LOCALE,
+    cloakbrowserTimezone: env.TIKTOK_CLOAKBROWSER_TIMEZONE,
+    cloakbrowserProxy: env.TIKTOK_CLOAKBROWSER_PROXY,
+    cloakbrowserPostNavigateDelayMinMs: Number(env.TIKTOK_CLOAKBROWSER_POST_NAVIGATE_DELAY_MIN_MS ?? 1200),
+    cloakbrowserPostNavigateDelayMaxMs: Number(env.TIKTOK_CLOAKBROWSER_POST_NAVIGATE_DELAY_MAX_MS ?? 2600),
+    cloakbrowserPreSnapshotDelayMinMs: Number(env.TIKTOK_CLOAKBROWSER_PRE_SNAPSHOT_DELAY_MIN_MS ?? 900),
+    cloakbrowserPreSnapshotDelayMaxMs: Number(env.TIKTOK_CLOAKBROWSER_PRE_SNAPSHOT_DELAY_MAX_MS ?? 1800),
+    cloakbrowserPreSnapshotScrollMinY: Number(env.TIKTOK_CLOAKBROWSER_PRE_SNAPSHOT_SCROLL_MIN_Y ?? 240),
+    cloakbrowserPreSnapshotScrollMaxY: Number(env.TIKTOK_CLOAKBROWSER_PRE_SNAPSHOT_SCROLL_MAX_Y ?? 720)
   };
 }
 

@@ -32,7 +32,7 @@ async function runCommand(command, args, defaults) {
   if (!command || args.help) {
     return {
       usage:
-        "node src/monitor-cli.mjs <run-once|monitor-cycle|collect|collect-plan|collect-status|collect-persistent-batch|collect-cobrowser-batch|analyze|alert|report|seed import-feishu|seed merge-runs|seed promote-candidates|base-sync> [--source mock|chrome|playwright-persistent|cobrowser] [--targets accounts,shops] [--data-dir monitoring_data]"
+        "node src/monitor-cli.mjs <run-once|monitor-cycle|collect|collect-plan|collect-status|collect-persistent-batch|collect-cobrowser-batch|collect-cloakbrowser-batch|analyze|alert|report|seed import-feishu|seed merge-runs|seed promote-candidates|base-sync> [--source mock|chrome|playwright-persistent|cobrowser|cloakbrowser] [--targets accounts,shops] [--data-dir monitoring_data]"
     };
   }
 
@@ -64,6 +64,23 @@ async function runCommand(command, args, defaults) {
     cobrowserHeadless: booleanArg(args["cobrowser-headless"], defaults.cobrowserHeadless),
     cobrowserProfile: args["cobrowser-profile"] ?? defaults.cobrowserProfile,
     cobrowserFresh: booleanArg(args["cobrowser-fresh"], defaults.cobrowserFresh),
+    cloakbrowserProfileDir: args["cloakbrowser-profile-dir"] ?? defaults.cloakbrowserProfileDir,
+    cloakbrowserRuntimeModule: args["cloakbrowser-runtime-module"] ?? defaults.cloakbrowserRuntimeModule,
+    cloakbrowserSourceProfileDir: args["cloakbrowser-source-profile-dir"] ?? defaults.cloakbrowserSourceProfileDir,
+    cloakbrowserSeedProfileDir: args["cloakbrowser-seed-profile-dir"] ?? defaults.cloakbrowserSeedProfileDir,
+    cloakbrowserHeadless: booleanArg(args["cloakbrowser-headless"], defaults.cloakbrowserHeadless),
+    cloakbrowserFresh: booleanArg(args["cloakbrowser-fresh"], defaults.cloakbrowserFresh),
+    cloakbrowserHumanize: booleanArg(args["cloakbrowser-humanize"], defaults.cloakbrowserHumanize),
+    cloakbrowserHumanPreset: args["cloakbrowser-human-preset"] ?? defaults.cloakbrowserHumanPreset,
+    cloakbrowserLocale: args["cloakbrowser-locale"] ?? defaults.cloakbrowserLocale,
+    cloakbrowserTimezone: args["cloakbrowser-timezone"] ?? defaults.cloakbrowserTimezone,
+    cloakbrowserProxy: args["cloakbrowser-proxy"] ?? defaults.cloakbrowserProxy,
+    cloakbrowserPostNavigateDelayMinMs: numberArg(args["cloakbrowser-post-navigate-delay-min-ms"], defaults.cloakbrowserPostNavigateDelayMinMs),
+    cloakbrowserPostNavigateDelayMaxMs: numberArg(args["cloakbrowser-post-navigate-delay-max-ms"], defaults.cloakbrowserPostNavigateDelayMaxMs),
+    cloakbrowserPreSnapshotDelayMinMs: numberArg(args["cloakbrowser-pre-snapshot-delay-min-ms"], defaults.cloakbrowserPreSnapshotDelayMinMs),
+    cloakbrowserPreSnapshotDelayMaxMs: numberArg(args["cloakbrowser-pre-snapshot-delay-max-ms"], defaults.cloakbrowserPreSnapshotDelayMaxMs),
+    cloakbrowserPreSnapshotScrollMinY: numberArg(args["cloakbrowser-pre-snapshot-scroll-min-y"], defaults.cloakbrowserPreSnapshotScrollMinY),
+    cloakbrowserPreSnapshotScrollMaxY: numberArg(args["cloakbrowser-pre-snapshot-scroll-max-y"], defaults.cloakbrowserPreSnapshotScrollMaxY),
     publicFirst: defaults.publicFirst,
     requireLoginOnBlock: defaults.requireLoginOnBlock,
     refreshPlan: booleanArg(args["refresh-plan"], false)
@@ -139,6 +156,16 @@ async function runCommand(command, args, defaults) {
   if (command === "collect-cobrowser-batch") {
     const { runCoBrowserMonitorBatch } = await loadCoBrowserBatchRunner();
     return runCoBrowserMonitorBatch({
+      dataDir,
+      now,
+      refreshPlan: Boolean(args["refresh-plan"]),
+      config
+    });
+  }
+
+  if (command === "collect-cloakbrowser-batch") {
+    const { runCloakBrowserMonitorBatch } = await loadCloakBrowserBatchRunner();
+    return runCloakBrowserMonitorBatch({
       dataDir,
       now,
       refreshPlan: Boolean(args["refresh-plan"]),
@@ -284,6 +311,19 @@ async function loadCoBrowserBatchRunner() {
     if (isMissingModule(error, "cobrowser-runner.mjs")) {
       throw new Error(
         "cobrowser runner module is not available yet; add src/monitor/cobrowser-runner.mjs before using collect-cobrowser-batch"
+      );
+    }
+    throw error;
+  }
+}
+
+async function loadCloakBrowserBatchRunner() {
+  try {
+    return await import("./monitor/cloakbrowser-runner.mjs");
+  } catch (error) {
+    if (isMissingModule(error, "cloakbrowser-runner.mjs")) {
+      throw new Error(
+        "cloakbrowser runner module is not available yet; add src/monitor/cloakbrowser-runner.mjs before using collect-cloakbrowser-batch"
       );
     }
     throw error;

@@ -1,6 +1,6 @@
 # TikTok monitor
 
-Portable local plugin for running TikTok monitoring with the stable `CoBrowser` browser path.
+Portable local plugin for running TikTok monitoring with the stable `CloakBrowser` browser path.
 
 ## What shows up in the plugin page
 
@@ -10,7 +10,7 @@ Codex plugin pages primarily surface plugin metadata and skills, not raw script 
 
 - Can run from a bundled runtime
 - Falls back to the repository source tree when the bundle is absent
-- Defaults to `CoBrowser` for real collection
+- Defaults to `CloakBrowser` for real collection
 - Reminds the user about first-time setup
 
 ## First-time setup
@@ -25,7 +25,7 @@ Checklist:
 
 1. Build the bundled runtime with `node scripts/build-bundle.mjs`.
 2. Install or copy the plugin to the target machine.
-3. Ensure `CoBrowser` is installed and its `source-profile` has logged in to TikTok.
+3. Ensure `CloakBrowser` is installed and its `source-profile` has logged in to TikTok.
 4. Ensure `monitoring_data/alert_config.json` exists with your Feishu DM recipient.
 5. Ensure `monitoring_data/base_dashboard_config.json` exists if Base sync is required.
 
@@ -61,7 +61,7 @@ Optional environment variables:
 
 - `TIKTOK_MONITOR_REPO`
 - `TIKTOK_MONITOR_DATA_DIR`
-- `COBROWSER_ROOT_DIR`
+- `CLOAKBROWSER_HOME`
 
 If the bundle is absent and `TIKTOK_MONITOR_REPO` is not set, the plugin tries:
 
@@ -71,8 +71,8 @@ If the bundle is absent and `TIKTOK_MONITOR_REPO` is not set, the plugin tries:
 
 ## Default command mapping
 
-- `cycle` -> `node src/monitor-cli.mjs monitor-cycle --source cobrowser`
-- `collect-batch` -> `node src/monitor-cli.mjs collect-cobrowser-batch`
+- `cycle` -> `node src/monitor-cli.mjs monitor-cycle --source cloakbrowser --max-tabs 1 --max-seed-videos 1 --max-accounts 1`
+- `collect-batch` -> `node src/monitor-cli.mjs collect-cloakbrowser-batch --max-tabs 1 --max-seed-videos 1 --max-accounts 1`
 - `status` -> `node src/monitor-cli.mjs collect-status`
 
 ## Publication / migration shape
@@ -81,4 +81,4 @@ If the bundle is absent and `TIKTOK_MONITOR_REPO` is not set, the plugin tries:
 - Keep `../../.agents/plugins/marketplace.json` with the plugin so the repository carries its own local marketplace entry.
 - Build the runtime bundle before distribution.
 - Ship the built plugin folder plus the marketplace entry, or ship the generated release zip with `install.ps1`.
-- On a new machine: install CoBrowser, copy this plugin, log in once, configure Feishu files, then run `node scripts/tiktok-monitor.mjs cycle`.
+- On a new machine: install CloakBrowser, copy this plugin, log in once, configure Feishu files, then run `node scripts/tiktok-monitor.mjs cycle`.

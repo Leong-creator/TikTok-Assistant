@@ -10,18 +10,30 @@ import {
   resolveRuntime
 } from "../plugins/tiktok-monitor/scripts/tiktok-monitor.mjs";
 
-test("plugin command mapping keeps formal cobrowser monitor entrypoints", () => {
+test("plugin command mapping keeps formal cloakbrowser monitor entrypoints", () => {
   assert.deepEqual(mapCommand("cycle", "monitoring_data"), [
     "monitor-cycle",
     "--source",
-    "cobrowser",
+    "cloakbrowser",
     "--data-dir",
-    "monitoring_data"
+    "monitoring_data",
+    "--max-tabs",
+    "1",
+    "--max-seed-videos",
+    "1",
+    "--max-accounts",
+    "1"
   ]);
   assert.deepEqual(mapCommand("collect-batch", "monitoring_data"), [
-    "collect-cobrowser-batch",
+    "collect-cloakbrowser-batch",
     "--data-dir",
-    "monitoring_data"
+    "monitoring_data",
+    "--max-tabs",
+    "1",
+    "--max-seed-videos",
+    "1",
+    "--max-accounts",
+    "1"
   ]);
   assert.deepEqual(mapCommand("status", "monitoring_data"), [
     "collect-status",

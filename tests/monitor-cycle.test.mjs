@@ -58,6 +58,32 @@ test("runMonitorCycle batches collection and completes analysis/report chain whe
   }
 });
 
+test("runMonitorCycle supports cloakbrowser batches", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-cycle-cloak-"));
+  try {
+    await mkdir(path.join(dataDir, "snapshots"), { recursive: true });
+    await writeFile(path.join(dataDir, "snapshots", "video_snapshots.jsonl"), "");
+
+    const result = await runMonitorCycle({
+      dataDir,
+      source: "cloakbrowser",
+      config: {
+        runCloakBrowserMonitorBatch: async () => ({
+          source: "cloakbrowser",
+          batch: { videos: 1, accounts: 0, done: false },
+          snapshots: { video: 0, product: 0 },
+          cursor: { completed: true }
+        })
+      }
+    });
+
+    assert.equal(result.batches.length, 1);
+    assert.equal(result.batches[0].source, "cloakbrowser");
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 test("runMonitorCycle skips analysis and reporting when no new snapshots are written", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-cycle-empty-"));
   try {

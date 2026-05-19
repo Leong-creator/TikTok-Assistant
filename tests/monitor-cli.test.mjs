@@ -376,14 +376,15 @@ test("monitor CLI collect-plan and collect-status expose bounded batch state", a
   }
 });
 
-test("monitor CLI usage documents playwright-persistent source and batch command", async () => {
+test("monitor CLI usage documents cloakbrowser and other batch sources", async () => {
   const { stdout } = await execFileAsync("node", ["src/monitor-cli.mjs"], { cwd: path.resolve(".") });
 
   const result = JSON.parse(stdout);
   assert.match(result.usage, /collect-persistent-batch/);
   assert.match(result.usage, /collect-cobrowser-batch/);
+  assert.match(result.usage, /collect-cloakbrowser-batch/);
   assert.match(result.usage, /monitor-cycle/);
-  assert.match(result.usage, /--source mock\|chrome\|playwright-persistent\|cobrowser/);
+  assert.match(result.usage, /--source mock\|chrome\|playwright-persistent\|cobrowser\|cloakbrowser/);
 });
 
 test("monitor CLI collect-persistent-batch completes immediately when the plan has no targets", async () => {
@@ -425,6 +426,29 @@ test("monitor CLI collect-cobrowser-batch completes immediately when the plan ha
 
     const result = JSON.parse(stdout);
     assert.equal(result.source, "cobrowser");
+    assert.equal(result.batch.done, true);
+    assert.equal(result.snapshots.video, 0);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("monitor CLI collect-cloakbrowser-batch completes immediately when the plan has no targets", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-cloakbrowser-batch-"));
+  try {
+    await mkdir(path.join(dataDir, "seeds"), { recursive: true });
+    await writeFile(path.join(dataDir, "seeds", "accounts.json"), "[]");
+    await writeFile(path.join(dataDir, "seeds", "shops.json"), "[]");
+    await writeFile(path.join(dataDir, "seeds", "videos.json"), "[]");
+
+    const { stdout } = await execFileAsync(
+      "node",
+      ["src/monitor-cli.mjs", "collect-cloakbrowser-batch", "--data-dir", dataDir],
+      { cwd: path.resolve(".") }
+    );
+
+    const result = JSON.parse(stdout);
+    assert.equal(result.source, "cloakbrowser");
     assert.equal(result.batch.done, true);
     assert.equal(result.snapshots.video, 0);
   } finally {
