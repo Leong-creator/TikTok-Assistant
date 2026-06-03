@@ -2,8 +2,9 @@
 import path from "node:path";
 
 import { parseTargets, resolveMonitorConfig } from "./monitor/config.mjs";
-import { syncFeishuBaseDashboard } from "./monitor/base-dashboard.mjs";
+import { syncFeishuBaseDashboard, syncFeishuBaseSchema } from "./monitor/base-dashboard.mjs";
 import { createCollectionPlan, readCollectionCursor, readCollectionPlan } from "./monitor/collection-plan.mjs";
+import { syncWhitelistManualBaseTables } from "./monitor/manual-base-sync.mjs";
 import { createFeishuNotifier } from "./monitor/alerts.mjs";
 import { runMonitorCycle } from "./monitor/monitor-cycle.mjs";
 import { sendMonitorReport } from "./monitor/reporting.mjs";
@@ -32,7 +33,7 @@ async function runCommand(command, args, defaults) {
   if (!command || args.help) {
     return {
       usage:
-        "node src/monitor-cli.mjs <run-once|monitor-cycle|collect|collect-plan|collect-status|collect-persistent-batch|collect-cobrowser-batch|collect-cloakbrowser-batch|analyze|alert|report|seed import-feishu|seed merge-runs|seed promote-candidates|base-sync> [--source mock|chrome|playwright-persistent|cobrowser|cloakbrowser] [--targets accounts,shops] [--data-dir monitoring_data]"
+        "node src/monitor-cli.mjs <run-once|monitor-cycle|collect|collect-plan|collect-status|collect-persistent-batch|collect-cobrowser-batch|collect-cloakbrowser-batch|analyze|alert|report|seed import-feishu|seed merge-runs|seed promote-candidates|base-sync|base-schema-sync> [--source mock|chrome|playwright-persistent|cobrowser|cloakbrowser] [--targets accounts,shops] [--data-dir monitoring_data]"
     };
   }
 
@@ -54,6 +55,12 @@ async function runCommand(command, args, defaults) {
     maxShops: numberArg(args["max-shops"], undefined),
     maxSeedVideos: numberArg(args["max-seed-videos"], undefined),
     maxBatchIterations: numberArg(args["max-batch-iterations"], undefined),
+    profileViewDeltaThreshold: numberArg(args["profile-view-delta-threshold"], defaults.profileViewDeltaThreshold),
+    recycleLoginRequiredThreshold: numberArg(args["recycle-login-required-threshold"], defaults.recycleLoginRequiredThreshold),
+    recycleNavigationFailureThreshold: numberArg(args["recycle-navigation-failure-threshold"], defaults.recycleNavigationFailureThreshold),
+    recycleShallowContentThreshold: numberArg(args["recycle-shallow-content-threshold"], defaults.recycleShallowContentThreshold),
+    recycleLowSuccessMinAttempts: numberArg(args["recycle-low-success-min-attempts"], defaults.recycleLowSuccessMinAttempts),
+    recycleLowSuccessRateThreshold: numberArg(args["recycle-low-success-rate-threshold"], defaults.recycleLowSuccessRateThreshold),
     playwrightProfileDir: args["playwright-profile-dir"] ?? defaults.playwrightProfileDir,
     playwrightSourceProfileDir: args["playwright-source-profile-dir"] ?? defaults.playwrightSourceProfileDir,
     playwrightSeedProfileDir: args["playwright-seed-profile-dir"] ?? defaults.playwrightSeedProfileDir,
@@ -81,9 +88,19 @@ async function runCommand(command, args, defaults) {
     cloakbrowserPreSnapshotDelayMaxMs: numberArg(args["cloakbrowser-pre-snapshot-delay-max-ms"], defaults.cloakbrowserPreSnapshotDelayMaxMs),
     cloakbrowserPreSnapshotScrollMinY: numberArg(args["cloakbrowser-pre-snapshot-scroll-min-y"], defaults.cloakbrowserPreSnapshotScrollMinY),
     cloakbrowserPreSnapshotScrollMaxY: numberArg(args["cloakbrowser-pre-snapshot-scroll-max-y"], defaults.cloakbrowserPreSnapshotScrollMaxY),
+    brightDataFallback: booleanArg(args["brightdata-fallback"], defaults.brightDataFallback),
+    brightDataBrowserAuth: args["brightdata-browser-auth"] ?? defaults.brightDataBrowserAuth,
+    brightDataBrowserWsEndpoint: args["brightdata-browser-ws-endpoint"] ?? defaults.brightDataBrowserWsEndpoint,
+    brightDataConnectTimeoutMs: numberArg(args["brightdata-connect-timeout-ms"], defaults.brightDataConnectTimeoutMs),
+    brightDataTimeoutMs: numberArg(args["brightdata-timeout-ms"], defaults.brightDataTimeoutMs),
+    brightDataSnapshotTimeoutMs: numberArg(args["brightdata-snapshot-timeout-ms"], defaults.brightDataSnapshotTimeoutMs),
+    brightDataSnapshotRetries: numberArg(args["brightdata-snapshot-retries"], defaults.brightDataSnapshotRetries),
+    brightDataSnapshotRetryDelayMs: numberArg(args["brightdata-snapshot-retry-delay-ms"], defaults.brightDataSnapshotRetryDelayMs),
     publicFirst: defaults.publicFirst,
     requireLoginOnBlock: defaults.requireLoginOnBlock,
-    refreshPlan: booleanArg(args["refresh-plan"], false)
+    refreshPlan: booleanArg(args["refresh-plan"], false),
+    baseDashboardConfigPath: args["base-dashboard-config-path"],
+    recordMapPath: args["record-map-path"]
   };
   const source = args.source ?? defaults.source;
   const alertMode = normalizeAlertMode(args.channel ?? args["alert-mode"] ?? defaults.feishuAlertMode);
@@ -128,7 +145,28 @@ async function runCommand(command, args, defaults) {
       dataDir,
       baseToken: args["base-token"] ?? defaults.feishuBaseToken,
       tableMap: parseJsonArg(args["table-map"] ?? process.env.FEISHU_BASE_TABLE_MAP),
+      tableNames: parseJsonArg(args["table-names"]),
+      baseDashboardConfigPath: args["base-dashboard-config-path"],
+      recordMapPath: args["record-map-path"],
       dryRun: Boolean(args["dry-run"])
+    });
+  }
+
+  if (command === "base-schema-sync") {
+    return syncFeishuBaseSchema({
+      dataDir,
+      baseToken: args["base-token"] ?? defaults.feishuBaseToken,
+      tableMap: parseJsonArg(args["table-map"] ?? process.env.FEISHU_BASE_TABLE_MAP),
+      tableNames: parseJsonArg(args["table-names"]),
+      baseDashboardConfigPath: args["base-dashboard-config-path"],
+      dryRun: Boolean(args["dry-run"])
+    });
+  }
+
+  if (command === "base-sync-manual") {
+    return syncWhitelistManualBaseTables({
+      dataDir,
+      baseToken: args["base-token"] ?? defaults.feishuBaseToken
     });
   }
 
@@ -229,7 +267,7 @@ async function runCommand(command, args, defaults) {
       dataDir,
       now,
       recentWindowHours: numberArg(args["recent-window-hours"], 24),
-      maxSignals: numberArg(args["max-signals"], 5),
+      maxSignals: numberArg(args["max-signals"], 3),
       alertMode,
       alertRecipient,
       notifier: notifier ?? createFeishuNotifier({

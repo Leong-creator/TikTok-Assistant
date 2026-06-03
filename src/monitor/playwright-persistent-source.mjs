@@ -32,7 +32,7 @@ export async function collectPlaywrightPersistentSnapshots({
   try {
     const browserClient = createBrowserClient({
       context,
-      maxVideosPerAccount: numberOrDefault(config.maxVideosPerAccount, 60),
+      maxVideosPerAccount: numberOrDefault(config.maxVideosPerAccount, 120),
       maxProductsPerShop: numberOrDefault(config.maxProductsPerShop, 6),
       waitUntil: config.waitUntil ?? "domcontentloaded",
       timeoutMs: numberOrDefault(config.timeoutMs, 15_000),
@@ -48,7 +48,8 @@ export async function collectPlaywrightPersistentSnapshots({
       browserClient,
       accounts,
       shops,
-      videos
+      videos,
+      config
     });
 
     return {

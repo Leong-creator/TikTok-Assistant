@@ -286,8 +286,8 @@ test("monitor CLI report sends a summarized Feishu DM payload without real netwo
     assert.equal(result.sent, 1);
     assert.equal(result.failed, 0);
     assert.equal(result.summary.trackedAccounts, 1);
-    assert.match(result.text, /TikTok运营监控简报/u);
-    assert.match(result.text, /监控池：正式账号 1 \| 候选账号 0 \| 商品入口 0/u);
+    assert.match(result.text, /TikTok同行晨会简报/u);
+    assert.match(result.text, /监控池：账号池 1 \| 近90天视频 0/u);
   } finally {
     await rm(dataDir, { recursive: true, force: true });
   }
@@ -333,6 +333,7 @@ test("monitor CLI report falls back to monitoring_data alert_config.json for the
 test("monitor CLI collect-plan and collect-status expose bounded batch state", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-cli-plan-"));
   try {
+    const validVideoUrl = "https://www.tiktok.com/@book_alpha/video/7623225588626590990";
     await mkdir(path.join(dataDir, "seeds"), { recursive: true });
     await writeFile(
       path.join(dataDir, "seeds", "accounts.json"),
@@ -342,7 +343,7 @@ test("monitor CLI collect-plan and collect-status expose bounded batch state", a
           handle: "book_alpha",
           profileUrl: "https://www.tiktok.com/@book_alpha",
           enabled: true,
-          evidenceUrls: ["https://www.tiktok.com/@book_alpha/video/1"]
+          evidenceUrls: [validVideoUrl]
         },
         {
           id: "account-beta",
@@ -360,7 +361,7 @@ test("monitor CLI collect-plan and collect-status expose bounded batch state", a
     );
     const plan = JSON.parse(planStdout);
     assert.equal(plan.counts.videoTargets, 1);
-    assert.equal(plan.counts.accountTargets, 1);
+    assert.equal(plan.counts.accountTargets, 2);
 
     const { stdout: statusStdout } = await execFileAsync(
       "node",

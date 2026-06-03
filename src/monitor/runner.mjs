@@ -14,6 +14,8 @@ import {
   readJsonLines,
   writeJsonFile
 } from "./storage.mjs";
+import { isCanonicalTikTokVideoUrl } from "./video-time.mjs";
+import { isWhitelistSourceConfigured, loadWhitelistAccounts } from "./whitelist-accounts.mjs";
 
 export async function runMonitorOnce({
   dataDir = "monitoring_data",
@@ -24,7 +26,8 @@ export async function runMonitorOnce({
   notifier,
   alertMode = "dm",
   alertRecipient,
-  config = {}
+  config = {},
+  whitelistAccounts
 } = {}) {
   await ensureMonitorDataDirs(dataDir);
 
@@ -34,13 +37,15 @@ export async function runMonitorOnce({
     targets,
     now,
     browserClient,
-    config
+    config,
+    whitelistAccounts
   });
 
   const analysis = await analyzeMonitorData({
     dataDir,
     now,
-    config
+    config,
+    whitelistAccounts
   });
 
   const alerts = await sendMonitorAlerts({
@@ -67,20 +72,37 @@ export async function collectMonitorSnapshots({
   targets = ["accounts", "shops"],
   now = new Date(),
   browserClient,
-  config = {}
+  config = {},
+  whitelistAccounts
 } = {}) {
   await ensureMonitorDataDirs(dataDir);
+  const resolvedWhitelistAccounts = whitelistAccounts ?? config.whitelistAccounts ?? (await loadWhitelistAccounts({ dataDir }));
+  const hasWhitelist = Array.isArray(whitelistAccounts)
+    ? true
+    : config.whitelistAccounts
+      ? true
+      : await isWhitelistSourceConfigured({ dataDir });
   const seeds = await readSeeds(dataDir);
-  const selected = selectCollectionTargets({
-    now,
-    staleAccountDays: Number(config.staleAccountDays ?? 60),
-    accounts: targets.includes("accounts") ? seeds.accounts : [],
-    shops: targets.includes("shops") ? seeds.shops : []
-  });
+  const selected = hasWhitelist
+    ? {
+        accounts: resolvedWhitelistAccounts.filter((account) => account.enabled !== false && account.skipTracking !== true),
+        staleAccounts: [],
+        shops: targets.includes("shops") ? seeds.shops.filter((item) => item.enabled !== false) : []
+      }
+    : selectCollectionTargets({
+        now,
+        staleAccountDays: Number(config.staleAccountDays ?? 60),
+        accounts: targets.includes("accounts") ? seeds.accounts : [],
+        shops: targets.includes("shops") ? seeds.shops : []
+      });
   const selectedAccounts = limitItems(selected.accounts, config.maxAccounts);
   const selectedShops = limitItems(selected.shops, config.maxShops);
   const selectedVideos = limitItems(
-    targets.includes("videos") ? seeds.videos : [],
+    targets.includes("videos")
+      ? hasWhitelist
+        ? await readWhitelistTrackedVideos({ dataDir, handles: selectedAccounts.map((account) => account.handle), now })
+        : seeds.videos
+      : [],
     config.maxSeedVideos
   );
 
@@ -148,13 +170,31 @@ function limitItems(items, limit) {
 export async function analyzeMonitorData({
   dataDir = "monitoring_data",
   now = new Date(),
-  config = {}
+  config = {},
+  whitelistAccounts
 } = {}) {
   await ensureMonitorDataDirs(dataDir);
+  const resolvedWhitelistAccounts = whitelistAccounts ?? config.whitelistAccounts ?? (await loadWhitelistAccounts({ dataDir }));
+  const whitelistConfigured = Array.isArray(whitelistAccounts)
+    ? true
+    : config.whitelistAccounts
+      ? true
+      : await isWhitelistSourceConfigured({ dataDir });
+  const trackedHandles = new Set(
+    resolvedWhitelistAccounts
+      .filter((account) => account.enabled !== false && account.skipTracking !== true)
+      .map((account) => String(account.handle ?? "").trim())
+      .filter(Boolean)
+  );
+  const whitelistMode = whitelistConfigured;
   const videoSnapshotPath = path.join(dataDir, "snapshots", "video_snapshots.jsonl");
   const productSnapshotPath = path.join(dataDir, "snapshots", "shop_product_snapshots.jsonl");
-  const allVideoSnapshots = await readJsonLines(videoSnapshotPath);
-  const allProductSnapshots = await readJsonLines(productSnapshotPath);
+  const allVideoSnapshots = (await readJsonLines(videoSnapshotPath))
+    .filter((snapshot) => isCanonicalTikTokVideoUrl(snapshot?.videoUrl ?? ""))
+    .filter((snapshot) =>
+      !whitelistMode || trackedHandles.has(String(snapshot.accountHandle ?? "").trim())
+    );
+  const allProductSnapshots = whitelistMode ? [] : await readJsonLines(productSnapshotPath);
   const signals = [
     ...analyzeVideoSnapshots(allVideoSnapshots, {
       now,
@@ -222,21 +262,73 @@ async function backfillAccountsFromVideoSnapshots({ dataDir, videoSnapshots, now
   const existing = await readJsonFile(accountsPath, []);
   const byHandle = new Map(existing.map((account) => [account.handle, account]));
   const lastDiscoveredAt = new Date(now).toISOString();
+  const snapshotSummaryByHandle = summarizeAccountSnapshots(videoSnapshots);
 
   for (const handle of new Set(discovered)) {
     const current = byHandle.get(handle) ?? {};
+    const summary = snapshotSummaryByHandle.get(handle) ?? {};
     byHandle.set(handle, {
       id: current.id ?? `account-${slugify(handle)}`,
+      ...current,
       handle,
       profileUrl: current.profileUrl ?? `https://www.tiktok.com/@${handle}`,
       enabled: current.enabled ?? true,
-      ...current,
+      evidenceUrls: mergeRecentVideoUrls(current.evidenceUrls ?? [], summary.videoUrls ?? []),
+      latestCollectedAt: latestTimestamp(current.latestCollectedAt, summary.latestCollectedAt),
+      latestPublishedAt: latestTimestamp(current.latestPublishedAt, summary.latestPublishedAt),
       discoveredFrom: current.discoveredFrom ?? "video",
       lastDiscoveredAt
     });
   }
 
   await writeJsonFile(accountsPath, [...byHandle.values()]);
+}
+
+function summarizeAccountSnapshots(videoSnapshots = []) {
+  const byHandle = new Map();
+  for (const snapshot of videoSnapshots) {
+    const handle = String(snapshot.accountHandle ?? "").trim();
+    if (!handle) continue;
+    const current = byHandle.get(handle) ?? {
+      latestCollectedAt: null,
+      latestPublishedAt: null,
+      videoUrls: []
+    };
+    current.latestCollectedAt = latestTimestamp(current.latestCollectedAt, snapshot.collectedAt);
+    current.latestPublishedAt = latestTimestamp(current.latestPublishedAt, snapshot.postedAt);
+    if (snapshot.videoUrl) {
+      current.videoUrls.push({
+        videoUrl: snapshot.videoUrl,
+        postedAt: snapshot.postedAt ?? null,
+        collectedAt: snapshot.collectedAt ?? null
+      });
+    }
+    byHandle.set(handle, current);
+  }
+  return byHandle;
+}
+
+function mergeRecentVideoUrls(existingUrls = [], discoveredUrls = [], limit = 24) {
+  const ranked = [
+    ...discoveredUrls,
+    ...existingUrls.map((videoUrl) => ({ videoUrl, postedAt: null, collectedAt: null }))
+  ]
+    .filter((item) => item?.videoUrl)
+    .sort((left, right) => {
+      const rightRank = latestTimestamp(right.postedAt, right.collectedAt) ?? "";
+      const leftRank = latestTimestamp(left.postedAt, left.collectedAt) ?? "";
+      return rightRank.localeCompare(leftRank);
+    });
+  return [...new Set(ranked.map((item) => item.videoUrl))].slice(0, limit);
+}
+
+function latestTimestamp(...values) {
+  const timestamps = values
+    .filter(Boolean)
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+  if (!timestamps.length) return values.find(Boolean) ?? null;
+  return new Date(Math.max(...timestamps)).toISOString();
 }
 
 async function backfillShopsFromVideoSnapshots({ dataDir, videoSnapshots, now }) {
@@ -285,6 +377,39 @@ async function readSeeds(dataDir) {
   return { accounts, shops, videos };
 }
 
+async function readWhitelistTrackedVideos({ dataDir, handles = [], now = new Date() }) {
+  const handleSet = new Set(handles.map((handle) => String(handle ?? "").trim()).filter(Boolean));
+  if (!handleSet.size) return [];
+  const cutoff = new Date(now).getTime() - 90 * 24 * 60 * 60 * 1000;
+  const snapshots = await readJsonLines(path.join(dataDir, "snapshots", "video_snapshots.jsonl"));
+  const latestByVideoUrl = new Map();
+
+  for (const snapshot of snapshots) {
+    const handle = String(snapshot.accountHandle ?? "").trim();
+    const videoUrl = String(snapshot.videoUrl ?? "").trim();
+    if (!handleSet.has(handle) || !videoUrl || !isCanonicalTikTokVideoUrl(videoUrl)) continue;
+    const postedAt = snapshot.postedAt ? new Date(snapshot.postedAt).getTime() : Number.NaN;
+    if (!Number.isFinite(postedAt) || postedAt < cutoff) continue;
+    const current = latestByVideoUrl.get(videoUrl);
+    const collectedAt = snapshot.collectedAt ? new Date(snapshot.collectedAt).getTime() : 0;
+    const currentCollectedAt = current?.collectedAt ? new Date(current.collectedAt).getTime() : -1;
+    if (!current || collectedAt >= currentCollectedAt) {
+      latestByVideoUrl.set(videoUrl, {
+        id: `video-${slugify(videoUrl)}`,
+        accountHandle: handle,
+        videoUrl,
+        postedAt: snapshot.postedAt,
+        enabled: true,
+        collectedAt: snapshot.collectedAt
+      });
+    }
+  }
+
+  return [...latestByVideoUrl.values()]
+    .sort((left, right) => new Date(right.postedAt).getTime() - new Date(left.postedAt).getTime())
+    .map(({ collectedAt, ...video }) => video);
+}
+
 async function collectSnapshots(options) {
   if (options.source === "chrome") {
     return collectChromeSnapshots(options);
@@ -305,7 +430,7 @@ async function collectSnapshots(options) {
 }
 
 async function writeLeads(dataDir, signals, now) {
-  const leadSignals = signals.filter((signal) => signal.entityType === "video" && signal.recommendedAction === "create_lead");
+  const leadSignals = signals.filter((signal) => signal.entityType === "video" && signal.leadEligible !== false);
   for (const signal of leadSignals) {
     const slug = `${formatLocalDate(new Date(now))}-${slugify(signal.accountHandle ?? "video")}-${slugify(lastPathSegment(signal.entityUrl))}`;
     await writeJsonFile(path.join(dataDir, "leads", slug, "source.json"), {

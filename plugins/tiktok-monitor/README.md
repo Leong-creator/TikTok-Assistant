@@ -11,6 +11,8 @@ Codex plugin pages primarily surface plugin metadata and skills, not raw script 
 - Can run from a bundled runtime
 - Falls back to the repository source tree when the bundle is absent
 - Defaults to `CloakBrowser` for real collection
+- Uses a slow single-tab humanized collection profile by default
+- Runs the full `collect -> analyze -> base-sync -> report` cycle by default
 - Reminds the user about first-time setup
 
 ## First-time setup
@@ -28,6 +30,7 @@ Checklist:
 3. Ensure `CloakBrowser` is installed and its `source-profile` has logged in to TikTok.
 4. Ensure `monitoring_data/alert_config.json` exists with your Feishu DM recipient.
 5. Ensure `monitoring_data/base_dashboard_config.json` exists if Base sync is required.
+6. Keep the TikTok source profile healthy. If the site starts returning login walls or blank profile lists, refresh the headed source-profile session before assuming the collector is broken.
 
 For local installation:
 
@@ -71,8 +74,8 @@ If the bundle is absent and `TIKTOK_MONITOR_REPO` is not set, the plugin tries:
 
 ## Default command mapping
 
-- `cycle` -> `node src/monitor-cli.mjs monitor-cycle --source cloakbrowser --max-tabs 1 --max-seed-videos 1 --max-accounts 1`
-- `collect-batch` -> `node src/monitor-cli.mjs collect-cloakbrowser-batch --max-tabs 1 --max-seed-videos 1 --max-accounts 1`
+- `cycle` -> `node src/monitor-cli.mjs monitor-cycle --source cloakbrowser --max-tabs 1 --max-batch-iterations 120 --max-seed-videos 20 --max-accounts 1 --cloakbrowser-humanize true --cloakbrowser-human-preset careful`
+- `collect-batch` -> `node src/monitor-cli.mjs collect-cloakbrowser-batch --max-tabs 1 --max-seed-videos 20 --max-accounts 1 --cloakbrowser-humanize true --cloakbrowser-human-preset careful`
 - `status` -> `node src/monitor-cli.mjs collect-status`
 
 ## Publication / migration shape

@@ -374,7 +374,11 @@ async function collectProfileShopRefs({ browserClient, listTab, account, query }
 
 async function collectProfileVideos({ browserClient, profileTab, account, maxVideos }) {
   if (browserClient.extractProfileVideos) {
-    return browserClient.extractProfileVideos({ profileTab, account, maxVideos });
+    const result = await browserClient.extractProfileVideos({ profileTab, account, maxVideos });
+    if (Array.isArray(result)) return result;
+    if (Array.isArray(result?.videos) && result.videos.length) return result.videos;
+    if (Array.isArray(result?.videoLinks)) return result.videoLinks;
+    return [];
   }
   if (profileTab.playwright?.domSnapshot) {
     return [];

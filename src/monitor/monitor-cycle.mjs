@@ -40,6 +40,7 @@ export async function runMonitorCycle({
 
   const afterCount = (await readJsonLines(snapshotPath)).length;
   const newSnapshots = Math.max(0, afterCount - beforeCount);
+  const coverage = summarizeCycleCoverage(batches);
 
   let analysis = { signals: 0 };
   let baseSync = null;
@@ -51,6 +52,8 @@ export async function runMonitorCycle({
       dataDir,
       baseToken: config.feishuBaseToken,
       tableMap: config.feishuBaseTableMap,
+      baseDashboardConfigPath: config.baseDashboardConfigPath,
+      recordMapPath: config.recordMapPath,
       dryRun: Boolean(config.baseSyncDryRun)
     });
     report = await (config.sendMonitorReport ?? sendMonitorReport)({
@@ -72,6 +75,7 @@ export async function runMonitorCycle({
     source,
     newSnapshots,
     batches,
+    coverage,
     analysis,
     baseSync,
     report
@@ -99,4 +103,37 @@ async function runMonitorBatch({ source, dataDir, now, config, refreshPlan }) {
 function numberOrDefault(value, fallback) {
   const number = Number(value ?? fallback);
   return Number.isFinite(number) ? number : fallback;
+}
+
+function summarizeCycleCoverage(batches = []) {
+  const planned = batches.find((batch) => batch?.planned) ?? {};
+  const plannedCounts = planned.planned ?? {};
+  const plannedAccounts = Number(plannedCounts.accountTargets ?? plannedCounts.accounts ?? sumBatchField(batches, "accounts"));
+  const plannedVideos = Number(plannedCounts.videoTargets ?? sumBatchField(batches, "videos"));
+  const processedAccounts = sumBatchField(batches, "accounts");
+  const processedVideos = sumBatchField(batches, "videos");
+  const refreshedVideoSnapshots = batches.reduce(
+    (total, batch) => total + Number(batch?.snapshots?.video ?? 0),
+    0
+  );
+  const failedTargets = batches.reduce(
+    (total, batch) => total + Number(batch?.failures?.length ?? 0),
+    0
+  );
+
+  return {
+    plannedAccounts,
+    plannedVideos,
+    processedAccounts,
+    processedVideos,
+    accountBatchCompleted: processedAccounts >= plannedAccounts,
+    videoBatchCompleted: processedVideos >= plannedVideos,
+    targetProcessingCompleted: processedAccounts >= plannedAccounts && processedVideos >= plannedVideos,
+    refreshedVideoSnapshots,
+    failedTargets
+  };
+}
+
+function sumBatchField(batches = [], key) {
+  return batches.reduce((total, batch) => total + Number(batch?.batch?.[key] ?? 0), 0);
 }

@@ -10,16 +10,16 @@ export class ChromeTabLedger {
   }
 
   async acquire(purpose = "collector") {
-    if (this.tabs.size >= this.maxTabs) {
-      await this.recycleIdleTab();
-    }
-
     const reusable = this.findIdleTab();
-    if (reusable && this.tabs.size < this.maxTabs) {
+    if (reusable) {
       reusable.status = "busy";
       reusable.purpose = purpose;
       reusable.lastUsedOrder = ++this.sequence;
       return reusable.tab;
+    }
+
+    if (this.tabs.size >= this.maxTabs) {
+      await this.recycleIdleTab();
     }
 
     if (this.tabs.size >= this.maxTabs) {

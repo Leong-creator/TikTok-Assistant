@@ -3,7 +3,12 @@ import {
   parseTikTokShopProducts,
   parseTikTokVideoDetail
 } from "./chrome-plugin-bridge.mjs";
-import { parseTikTokProfileShopRefs, parseTikTokSearchResults } from "./discovery.mjs";
+import {
+  buildTikTokSearchUrl,
+  parseTikTokProfileShopRefs,
+  parseTikTokSearchResults
+} from "./discovery.mjs";
+import { isLikelyTikTokVideoId } from "./video-time.mjs";
 
 export function createPlaywrightBrowserClient({
   context,
@@ -53,7 +58,7 @@ export function createPlaywrightBrowserClient({
       await applyPostNavigateHumanization(tab, humanizedSettings);
     },
     async extractAccountVideos({ listTab, detailTab, account }) {
-      const listResult = await readParsedSnapshot(listTab, (snapshot) => {
+      let listResult = await readParsedSnapshot(listTab, (snapshot) => {
         const videoLinks = parseTikTokProfileVideos(snapshot, {
           baseUrl: account.profileUrl,
           maxVideos: maxVideosPerAccount
@@ -68,6 +73,25 @@ export function createPlaywrightBrowserClient({
         snapshotTimeoutMs,
         beforeSnapshot: (attempt) => applyPreSnapshotHumanization(listTab, humanizedSettings, attempt)
       });
+      const capturedVideos = extractProfileVideosFromCapturedResponses(listTab, {
+        account,
+        maxVideos: maxVideosPerAccount
+      });
+      if (capturedVideos.length) {
+        return { status: "ok", videos: capturedVideos, failures: [] };
+      }
+      if (shouldFallbackToSearchDiscovery(listResult)) {
+        const fallback = await discoverAccountVideosFromSearch({
+          browserClient: client,
+          listTab,
+          account,
+          maxVideos: maxVideosPerAccount,
+          humanizedSettings
+        });
+        if (fallback.status === "ok" && fallback.videoLinks.length) {
+          listResult = fallback;
+        }
+      }
       if (listResult.status !== "ok") return listResult;
 
       const videos = [];
@@ -75,7 +99,7 @@ export function createPlaywrightBrowserClient({
       const readTab = detailTab ?? listTab;
       for (const link of listResult.videoLinks) {
         await client.navigate(readTab, link.videoUrl);
-        const detail = await readParsedSnapshot(readTab, (snapshot) => parseTikTokVideoDetail(snapshot, {
+        const detail = resolveVideoDetailDocumentFallback(readTab, await readParsedSnapshot(readTab, (snapshot) => parseTikTokVideoDetail(snapshot, {
           videoUrl: link.videoUrl,
           accountHandle: account.handle,
           currentUrl: getTabCurrentUrl(readTab)
@@ -85,6 +109,10 @@ export function createPlaywrightBrowserClient({
           snapshotTimeoutMs,
           beforeSnapshot: (attempt) => applyPreSnapshotHumanization(readTab, humanizedSettings, attempt),
           shouldRetry: shouldRetryVideoMetrics
+        }), {
+          videoUrl: link.videoUrl,
+          accountHandle: account.handle,
+          currentUrl: getTabCurrentUrl(readTab)
         });
         if (detail.status === "ok") {
           videos.push(detail.video);
@@ -102,7 +130,7 @@ export function createPlaywrightBrowserClient({
       return { status: "ok", videos, failures };
     },
     async extractDirectVideo({ detailTab, video }) {
-      return readParsedSnapshot(detailTab, (snapshot) => parseTikTokVideoDetail(snapshot, {
+      return resolveVideoDetailDocumentFallback(detailTab, await readParsedSnapshot(detailTab, (snapshot) => parseTikTokVideoDetail(snapshot, {
         videoUrl: video.videoUrl,
         accountHandle: video.accountHandle,
         currentUrl: getTabCurrentUrl(detailTab)
@@ -112,6 +140,10 @@ export function createPlaywrightBrowserClient({
         snapshotTimeoutMs,
         beforeSnapshot: (attempt) => applyPreSnapshotHumanization(detailTab, humanizedSettings, attempt),
         shouldRetry: shouldRetryVideoMetrics
+      }), {
+        videoUrl: video.videoUrl,
+        accountHandle: video.accountHandle,
+        currentUrl: getTabCurrentUrl(detailTab)
       });
     },
     async extractSearchResults({ listTab, query }) {
@@ -137,7 +169,7 @@ export function createPlaywrightBrowserClient({
       });
     },
     async extractProfileVideos({ profileTab, account, maxVideos }) {
-      return readParsedSnapshot(profileTab, (snapshot) => parseTikTokProfileVideos(snapshot, {
+      let listResult = await readParsedSnapshot(profileTab, (snapshot) => parseTikTokProfileVideos(snapshot, {
         baseUrl: account.profileUrl,
         maxVideos: maxVideos ?? maxVideosPerAccount
       }), {
@@ -147,6 +179,47 @@ export function createPlaywrightBrowserClient({
         beforeSnapshot: (attempt) => applyPreSnapshotHumanization(profileTab, humanizedSettings, attempt),
         shouldRetry: shouldRetryProfileVideos
       });
+      const capturedVideos = extractProfileVideosFromCapturedResponses(profileTab, {
+        account,
+        maxVideos: maxVideos ?? maxVideosPerAccount
+      });
+      if (capturedVideos.length) {
+        return {
+          status: "ok",
+          videoLinks: capturedVideos.map((video) => ({
+            videoUrl: video.videoUrl,
+            views: Number(video.views ?? 0)
+          })),
+          videos: capturedVideos
+        };
+      }
+      if (Array.isArray(listResult) && listResult.length) {
+        return {
+          status: "ok",
+          videoLinks: listResult,
+          videos: []
+        };
+      }
+      if (shouldFallbackToSearchDiscovery(listResult)) {
+        const fallback = await discoverAccountVideosFromSearch({
+          browserClient: client,
+          listTab: profileTab,
+          account,
+          maxVideos: maxVideos ?? maxVideosPerAccount,
+          humanizedSettings
+        });
+        if (fallback.status === "ok" && fallback.videoLinks.length) {
+          listResult = fallback;
+        }
+      }
+      if (Array.isArray(listResult)) {
+        return {
+          status: "ok",
+          videoLinks: listResult,
+          videos: []
+        };
+      }
+      return listResult;
     },
     async extractShopProducts({ listTab, shop }) {
       return readParsedSnapshot(listTab, (snapshot) => parseTikTokShopProducts(snapshot, {
@@ -165,7 +238,108 @@ export function createPlaywrightBrowserClient({
   return client;
 }
 
+async function discoverAccountVideosFromSearch({
+  browserClient,
+  listTab,
+  account,
+  maxVideos,
+  humanizedSettings
+}) {
+  const queries = buildAccountSearchQueries(account);
+  const links = new Map();
+  let lastFailure = null;
+
+  for (const query of queries) {
+    await browserClient.navigate(listTab, buildTikTokSearchUrl(query));
+    const parsed = await readParsedSnapshot(listTab, (snapshot) => parseTikTokSearchResults(snapshot, { query }), {
+      retries: 2,
+      retryDelayMs: 400,
+      snapshotTimeoutMs: 10_000,
+      beforeSnapshot: (attempt) => applyPreSnapshotHumanization(listTab, humanizedSettings, attempt),
+      shouldRetry: shouldRetrySearchResults
+    });
+
+    if (!parsed?.accounts && !parsed?.videos) {
+      lastFailure = parsed;
+      continue;
+    }
+
+    const matchingVideos = collectSearchVideoLinks(parsed, account.handle, maxVideos);
+    for (const video of matchingVideos) {
+      links.set(video.videoUrl, video);
+      if (links.size >= maxVideos) {
+        return { status: "ok", videoLinks: [...links.values()] };
+      }
+    }
+  }
+
+  if (links.size) {
+    return { status: "ok", videoLinks: [...links.values()] };
+  }
+
+  return lastFailure ?? { status: "missing_metrics", reason: "search fallback did not expose account video links" };
+}
+
+function buildAccountSearchQueries(account) {
+  const handle = normalizeHandle(account?.handle);
+  if (!handle) return [];
+  return [...new Set([`@${handle}`, handle])];
+}
+
+function collectSearchVideoLinks(parsed, handle, maxVideos) {
+  const normalizedHandle = normalizeHandle(handle);
+  const links = new Map();
+
+  for (const video of parsed.videos ?? []) {
+    if (normalizeHandle(video.handle) !== normalizedHandle || !video.videoUrl) continue;
+    links.set(video.videoUrl, { videoUrl: video.videoUrl, views: undefined });
+    if (links.size >= maxVideos) return [...links.values()];
+  }
+
+  for (const account of parsed.accounts ?? []) {
+    if (normalizeHandle(account.handle) !== normalizedHandle) continue;
+    for (const videoUrl of account.evidenceUrls ?? []) {
+      links.set(videoUrl, { videoUrl, views: undefined });
+      if (links.size >= maxVideos) return [...links.values()];
+    }
+  }
+
+  return [...links.values()];
+}
+
+function shouldFallbackToSearchDiscovery(result) {
+  if (!result || result.status === "ok") return false;
+  return result.status === "missing_metrics" || result.status === "login_required";
+}
+
+function normalizeHandle(value) {
+  return String(value ?? "").trim().replace(/^@/u, "").toLowerCase();
+}
+
 function wrapPage(page) {
+  const capturedResponses = [];
+  let capturedDocumentHtml = "";
+  page.on?.("response", async (response) => {
+    const url = typeof response?.url === "function" ? response.url() : response?.url;
+    const headers = typeof response?.allHeaders === "function" ? await response.allHeaders().catch(() => ({})) : {};
+    const contentType = headers["content-type"] ?? headers["Content-Type"] ?? "";
+    try {
+      const text = typeof response?.text === "function"
+        ? await response.text()
+        : typeof response?.body === "string"
+          ? response.body
+          : "";
+      if (!text) return;
+      if (/text\/html/iu.test(contentType)) {
+        capturedDocumentHtml = text;
+      }
+      if (!/\/api\/post\/item_list\//iu.test(String(url ?? ""))) return;
+      capturedResponses.push({ url, body: JSON.parse(text) });
+      if (capturedResponses.length > 12) capturedResponses.shift();
+    } catch {
+      // Ignore malformed or empty response bodies.
+    }
+  });
   return {
     id: page.guid ?? `page-${Date.now()}`,
     get url() {
@@ -193,7 +367,15 @@ function wrapPage(page) {
         return page.waitForLoadState(state, { timeout: timeoutMs });
       }
     },
+    getCapturedResponses() {
+      return [...capturedResponses];
+    },
+    getCapturedDocumentHtml() {
+      return capturedDocumentHtml;
+    },
     async goto(url) {
+      capturedResponses.length = 0;
+      capturedDocumentHtml = "";
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15_000 });
       await page.waitForLoadState("domcontentloaded", { timeout: 15_000 });
     },
@@ -243,6 +425,109 @@ function shouldRetryProfileRefs(result) {
 
 function shouldRetryProfileVideos(result) {
   return Array.isArray(result) && result.length === 0;
+}
+
+function resolveVideoDetailDocumentFallback(tab, primaryResult, { videoUrl, accountHandle, currentUrl } = {}) {
+  if (primaryResult?.status === "ok") return primaryResult;
+  const documentHtml = tab?.getCapturedDocumentHtml?.();
+  if (!documentHtml) return primaryResult;
+  const fallback = parseTikTokVideoDetail(documentHtml, {
+    videoUrl,
+    accountHandle,
+    currentUrl
+  });
+  return fallback?.status === "ok" ? fallback : primaryResult;
+}
+
+function extractProfileVideosFromCapturedResponses(tab, { account, maxVideos }) {
+  const responses = tab?.getCapturedResponses?.() ?? [];
+  if (!responses.length) return [];
+
+  const normalizedHandle = normalizeHandle(account?.handle);
+  const videos = new Map();
+  for (const response of responses) {
+    const candidates = collectVideoCandidates(response.body, normalizedHandle);
+    for (const video of candidates) {
+      if (videos.has(video.videoUrl)) continue;
+      videos.set(video.videoUrl, video);
+      if (videos.size >= maxVideos) {
+        return [...videos.values()];
+      }
+    }
+  }
+  return [...videos.values()];
+}
+
+function collectVideoCandidates(value, normalizedHandle, inheritedHandle, sink = new Map()) {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectVideoCandidates(entry, normalizedHandle, inheritedHandle, sink);
+    }
+    return [...sink.values()];
+  }
+  if (!value || typeof value !== "object") {
+    return [...sink.values()];
+  }
+
+  const objectHandle = normalizeHandle(
+    value.author?.uniqueId ??
+    value.author?.unique_id ??
+    value.authorInfo?.uniqueId ??
+    inheritedHandle
+  );
+  const itemId = stringifyVideoId(value.id ?? value.itemId ?? value.item_id);
+  const looksLikeVideoRecord = Boolean(
+    itemId &&
+    (value.createTime || value.create_time || value.stats || value.statsV2 || value.desc || value.video || value.imagePost)
+  );
+  if (looksLikeVideoRecord) {
+    const handleForUrl = objectHandle || normalizedHandle;
+    if (handleForUrl && (!normalizedHandle || handleForUrl === normalizedHandle)) {
+      const videoUrl = `https://www.tiktok.com/@${handleForUrl}/video/${itemId}`;
+      if (!sink.has(videoUrl)) {
+        sink.set(videoUrl, {
+          accountHandle: handleForUrl,
+          videoUrl,
+          caption: String(value.desc ?? "").trim(),
+          postedAt: coerceTimestamp(value.createTime ?? value.create_time),
+          views: coerceMetricValue(value.statsV2?.playCount ?? value.stats?.playCount) ?? 0,
+          likes: coerceMetricValue(value.statsV2?.diggCount ?? value.stats?.diggCount) ?? 0,
+          comments: coerceMetricValue(value.statsV2?.commentCount ?? value.stats?.commentCount) ?? 0,
+          shares: coerceMetricValue(value.statsV2?.shareCount ?? value.stats?.shareCount) ?? 0,
+          productRefs: []
+        });
+      }
+    }
+  }
+
+  for (const nested of Object.values(value)) {
+    if (!nested || typeof nested !== "object") continue;
+    collectVideoCandidates(nested, normalizedHandle, objectHandle || inheritedHandle, sink);
+  }
+  return [...sink.values()];
+}
+
+function stringifyVideoId(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const text = String(Math.trunc(value));
+    return isLikelyTikTokVideoId(text) ? text : "";
+  }
+  const text = String(value ?? "").trim();
+  return isLikelyTikTokVideoId(text) ? text : "";
+}
+
+function coerceMetricValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const text = String(value ?? "").trim().replaceAll(",", "");
+  if (!text) return undefined;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+function coerceTimestamp(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return undefined;
+  return new Date(number * 1000).toISOString();
 }
 
 function getTabCurrentUrl(tab) {

@@ -12,6 +12,10 @@ import {
   runChromePluginMonitor
 } from "../src/monitor/chrome-plugin-runner.mjs";
 
+const VIDEO_ALPHA = "7615603816745979166";
+const VIDEO_BETA = "7623225588626590990";
+const VIDEO_RECENT = "7637752368508685589";
+
 test("runChromePluginMonitor wraps a Chrome plugin browser and runs the monitor loop", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tk-plugin-runner-"));
   try {
@@ -36,7 +40,7 @@ test("runChromePluginMonitor wraps a Chrome plugin browser and runs the monitor 
         collectedAt: "2026-05-09T06:00:00.000Z",
         source: "chrome",
         accountHandle: "book_alpha",
-        videoUrl: "https://www.tiktok.com/@book_alpha/video/735111",
+        videoUrl: `https://www.tiktok.com/@book_alpha/video/${VIDEO_RECENT}`,
         caption: "Public book video",
         postedAt: "2026-05-09T05:00:00.000Z",
         views: 1000,
@@ -49,9 +53,9 @@ test("runChromePluginMonitor wraps a Chrome plugin browser and runs the monitor 
 
     const browser = createFakePluginBrowser(
       new Map([
-        ["https://www.tiktok.com/@book_alpha", `<a href="/@book_alpha/video/735111">one</a>`],
+        ["https://www.tiktok.com/@book_alpha", `<a href="/@book_alpha/video/${VIDEO_RECENT}">one</a>`],
         [
-          "https://www.tiktok.com/@book_alpha/video/735111",
+          `https://www.tiktok.com/@book_alpha/video/${VIDEO_RECENT}`,
           "Caption: Public book video\n12.4K views\n1.2K likes\n88 comments\n35 shares"
         ]
       ])
@@ -100,9 +104,9 @@ test("runChromePluginMonitor forwards Chrome bridge timing config", async () => 
 
     const browser = createFakePluginBrowser(
       new Map([
-        ["https://www.tiktok.com/@book_alpha", `<a href="/@book_alpha/video/735111">one</a>`],
+        ["https://www.tiktok.com/@book_alpha", `<a href="/@book_alpha/video/${VIDEO_ALPHA}">one</a>`],
         [
-          "https://www.tiktok.com/@book_alpha/video/735111",
+          `https://www.tiktok.com/@book_alpha/video/${VIDEO_ALPHA}`,
           "Caption: Public book video\n12.4K views\n1.2K likes\n88 comments\n35 shares"
         ]
       ])
@@ -172,7 +176,7 @@ test("discoverChromePluginCandidates writes search account candidates through th
       new Map([
         [
           "https://www.tiktok.com/search?q=People+Skills+book",
-          `<a href="/@book_seller/video/735111">People Skills book review</a>`
+          `<a href="/@book_seller/video/${VIDEO_ALPHA}">People Skills book review</a>`
         ],
         [
           "https://www.tiktok.com/@book_seller",
@@ -208,7 +212,7 @@ test("discoverChromePluginShopsFromAccounts writes shops discovered from evidenc
       new Map([
         ["https://www.tiktok.com/@book_seller", `<div>profile</div>`],
         [
-          "https://www.tiktok.com/@book_seller/video/761",
+          "https://www.tiktok.com/@book_seller/video/7615603816745979166",
           `Caption: People Skills\n12.4K views\n1.2K likes\n88 comments\n35 shares\n<a href="/shop/p/people-skills-book">Buy</a>`
         ],
         [
@@ -227,7 +231,7 @@ test("discoverChromePluginShopsFromAccounts writes shops discovered from evidenc
           profileUrl: "https://www.tiktok.com/@book_seller",
           relatedBooks: ["people_skills"],
           sourceQuery: "people skill",
-          evidenceUrls: ["https://www.tiktok.com/@book_seller/video/761"]
+          evidenceUrls: ["https://www.tiktok.com/@book_seller/video/7615603816745979166"]
         }
       ],
       now: new Date("2026-05-10T01:00:00.000Z"),
@@ -257,7 +261,7 @@ test("runChromePluginMonitorBatch persists one bounded batch and advances cursor
           handle: "book_alpha",
           profileUrl: "https://www.tiktok.com/@book_alpha",
           enabled: true,
-          evidenceUrls: ["https://www.tiktok.com/@book_alpha/video/735111"]
+          evidenceUrls: [`https://www.tiktok.com/@book_alpha/video/${VIDEO_ALPHA}`]
         },
         {
           id: "account-beta",
@@ -272,15 +276,15 @@ test("runChromePluginMonitorBatch persists one bounded batch and advances cursor
     const browser = createFakePluginBrowser(
       new Map([
         [
-          "https://www.tiktok.com/@book_alpha/video/735111",
+          `https://www.tiktok.com/@book_alpha/video/${VIDEO_ALPHA}`,
           "Caption: Public book video\n12.4K views\n1.2K likes\n88 comments\n35 shares"
         ],
         [
           "https://www.tiktok.com/@book_beta",
-          `<a href="/@book_beta/video/735222">two</a>`
+          `<a href="/@book_beta/video/${VIDEO_BETA}">two</a>`
         ],
         [
-          "https://www.tiktok.com/@book_beta/video/735222",
+          `https://www.tiktok.com/@book_beta/video/${VIDEO_BETA}`,
           "Caption: Second book video\n10.1K views\n950 likes\n41 comments\n22 shares"
         ]
       ])
@@ -291,7 +295,7 @@ test("runChromePluginMonitorBatch persists one bounded batch and advances cursor
       now: new Date("2026-05-12T05:00:00.000Z")
     });
     assert.equal(plan.counts.videoTargets, 1);
-    assert.equal(plan.counts.accountTargets, 1);
+    assert.equal(plan.counts.accountTargets, 2);
 
     const first = await runChromePluginMonitorBatch({
       browser,
@@ -302,8 +306,8 @@ test("runChromePluginMonitorBatch persists one bounded batch and advances cursor
         maxAccounts: 1
       }
     });
-    assert.equal(first.batch.videos, 1);
-    assert.equal(first.batch.accounts, 0);
+    assert.equal(first.batch.videos, 0);
+    assert.equal(first.batch.accounts, 1);
     assert.equal(first.snapshots.video, 1);
 
     const second = await runChromePluginMonitorBatch({
@@ -317,7 +321,20 @@ test("runChromePluginMonitorBatch persists one bounded batch and advances cursor
     });
     assert.equal(second.batch.videos, 0);
     assert.equal(second.batch.accounts, 1);
-    assert.equal(second.snapshots.video, 1);
+    assert.equal(second.snapshots.video, 0);
+
+    const third = await runChromePluginMonitorBatch({
+      browser,
+      dataDir,
+      now: new Date("2026-05-12T05:20:00.000Z"),
+      config: {
+        maxSeedVideos: 1,
+        maxAccounts: 1
+      }
+    });
+    assert.equal(third.batch.videos, 1);
+    assert.equal(third.batch.accounts, 0);
+    assert.equal(third.snapshots.video, 1);
 
     const snapshotLog = await readFile(path.join(dataDir, "snapshots", "video_snapshots.jsonl"), "utf8");
     assert.equal(snapshotLog.trim().split("\n").length, 2);

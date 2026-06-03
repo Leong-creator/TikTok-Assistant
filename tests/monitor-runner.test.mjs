@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { runMonitorOnce } from "../src/monitor/runner.mjs";
 import { collectMonitorSnapshots } from "../src/monitor/runner.mjs";
+import { analyzeMonitorData } from "../src/monitor/runner.mjs";
 import { runPlaywrightPersistentMonitorBatch } from "../src/monitor/playwright-persistent-runner.mjs";
 
 test("runMonitorOnce with mock source writes snapshots, signals, leads, and Feishu DM payloads", async () => {
@@ -141,6 +142,9 @@ test("collectMonitorSnapshots backfills account seeds from resolved direct video
         handle: "book_alpha",
         profileUrl: "https://www.tiktok.com/@book_alpha",
         enabled: true,
+        evidenceUrls: ["https://www.tiktok.com/@book_alpha/video/7615603816745979166"],
+        latestCollectedAt: "2026-05-09T12:00:00.000Z",
+        latestPublishedAt: "2026-03-10T12:32:18.000Z",
         discoveredFrom: "video",
         lastDiscoveredAt: "2026-05-09T12:00:00.000Z"
       }
@@ -323,6 +327,11 @@ test("collectMonitorSnapshots dispatches to playwright-persistent source", async
 test("persistent batch runner advances collection cursor", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-persistent-batch-"));
   try {
+    const seedVideoUrl = "https://www.tiktok.com/@book_alpha/video/7623225588626590990";
+    const generatedUrls = {
+      book_alpha: "https://www.tiktok.com/@book_alpha/video/7629734921489206542",
+      book_beta: "https://www.tiktok.com/@book_beta/video/7637484035350088974"
+    };
     await mkdir(path.join(dataDir, "seeds"), { recursive: true });
     await writeFile(
       path.join(dataDir, "seeds", "accounts.json"),
@@ -332,7 +341,7 @@ test("persistent batch runner advances collection cursor", async () => {
           handle: "book_alpha",
           profileUrl: "https://www.tiktok.com/@book_alpha",
           enabled: true,
-          evidenceUrls: ["https://www.tiktok.com/@book_alpha/video/735111"]
+          evidenceUrls: [seedVideoUrl]
         },
         {
           id: "account-beta",
@@ -370,7 +379,7 @@ test("persistent batch runner advances collection cursor", async () => {
               collectedAt: new Date(now).toISOString(),
               source: "playwright-persistent",
               accountHandle: account.handle,
-              videoUrl: `${account.profileUrl}/video/generated`,
+              videoUrl: generatedUrls[account.handle],
               caption: "Account batch",
               views: 6,
               likes: 1,
@@ -385,10 +394,10 @@ test("persistent batch runner advances collection cursor", async () => {
       }
     });
 
-    assert.equal(first.batch.videos, 1);
-    assert.equal(first.batch.accounts, 0);
-    assert.equal(first.cursor.videoIndex, 1);
-    assert.equal(first.cursor.accountIndex, 0);
+    assert.equal(first.batch.videos, 0);
+    assert.equal(first.batch.accounts, 1);
+    assert.equal(first.cursor.videoIndex, 0);
+    assert.equal(first.cursor.accountIndex, 1);
 
     const second = await runPlaywrightPersistentMonitorBatch({
       dataDir,
@@ -416,7 +425,7 @@ test("persistent batch runner advances collection cursor", async () => {
               collectedAt: new Date(now).toISOString(),
               source: "playwright-persistent",
               accountHandle: account.handle,
-              videoUrl: `${account.profileUrl}/video/generated`,
+              videoUrl: generatedUrls[account.handle],
               caption: "Account batch",
               views: 6,
               likes: 1,
@@ -433,8 +442,231 @@ test("persistent batch runner advances collection cursor", async () => {
 
     assert.equal(second.batch.videos, 0);
     assert.equal(second.batch.accounts, 1);
-    assert.equal(second.cursor.videoIndex, 1);
-    assert.equal(second.cursor.accountIndex, 1);
+    assert.equal(second.cursor.videoIndex, 0);
+    assert.equal(second.cursor.accountIndex, 2);
+
+    const third = await runPlaywrightPersistentMonitorBatch({
+      dataDir,
+      now: new Date("2026-05-13T00:20:00.000Z"),
+      config: {
+        maxSeedVideos: 1,
+        maxAccounts: 1,
+        collectPlaywrightPersistentSnapshots: async ({ videos, accounts, now }) => ({
+          source: "playwright-persistent",
+          collectedAt: new Date(now).toISOString(),
+          videoSnapshots: [
+            ...videos.map((video) => ({
+              collectedAt: new Date(now).toISOString(),
+              source: "playwright-persistent",
+              accountHandle: video.accountHandle,
+              videoUrl: video.videoUrl,
+              caption: "Video batch",
+              views: 5,
+              likes: 1,
+              comments: 0,
+              shares: 0,
+              productRefs: []
+            })),
+            ...accounts.map((account) => ({
+              collectedAt: new Date(now).toISOString(),
+              source: "playwright-persistent",
+              accountHandle: account.handle,
+              videoUrl: generatedUrls[account.handle],
+              caption: "Account batch",
+              views: 6,
+              likes: 1,
+              comments: 0,
+              shares: 0,
+              productRefs: []
+            }))
+          ],
+          productSnapshots: [],
+          failures: []
+        })
+      }
+    });
+
+    assert.equal(third.batch.videos, 1);
+    assert.equal(third.batch.accounts, 0);
+    assert.equal(third.cursor.videoIndex, 1);
+    assert.equal(third.cursor.accountIndex, 2);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("collectMonitorSnapshots uses whitelist accounts and recent tracked videos", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-whitelist-collect-"));
+  try {
+    await mkdir(path.join(dataDir, "snapshots"), { recursive: true });
+    const snapshotLines = [
+      {
+        collectedAt: "2026-05-20T00:00:00.000Z",
+        postedAt: "2026-05-19T00:00:00.000Z",
+        accountHandle: "ps_alpha",
+        videoUrl: "https://www.tiktok.com/@ps_alpha/video/1111111111111111111",
+        views: 10,
+        likes: 2,
+        comments: 1,
+        shares: 0
+      },
+      {
+        collectedAt: "2026-05-20T00:00:00.000Z",
+        postedAt: "2026-01-01T00:00:00.000Z",
+        accountHandle: "ps_alpha",
+        videoUrl: "https://www.tiktok.com/@ps_alpha/video/2222222222222222222",
+        views: 10,
+        likes: 2,
+        comments: 1,
+        shares: 0
+      },
+      {
+        collectedAt: "2026-05-20T00:00:00.000Z",
+        postedAt: "2026-05-18T00:00:00.000Z",
+        accountHandle: "other_account",
+        videoUrl: "https://www.tiktok.com/@other_account/video/3333333333333333333",
+        views: 10,
+        likes: 2,
+        comments: 1,
+        shares: 0
+      }
+    ];
+    await writeFile(
+      path.join(dataDir, "snapshots", "video_snapshots.jsonl"),
+      snapshotLines.map((line) => JSON.stringify(line)).join("\n") + "\n"
+    );
+
+    const calls = [];
+    const result = await collectMonitorSnapshots({
+      dataDir,
+      source: "playwright-persistent",
+      targets: ["accounts", "videos"],
+      now: new Date("2026-05-21T00:00:00.000Z"),
+      whitelistAccounts: [
+        {
+          handle: "ps_alpha",
+          accountName: "ps_alpha",
+          profileUrl: "https://www.tiktok.com/@ps_alpha",
+          enabled: true,
+          skipTracking: false
+        },
+        {
+          handle: "skip_me",
+          accountName: "skip_me",
+          profileUrl: "https://www.tiktok.com/@skip_me",
+          enabled: false,
+          skipTracking: true
+        }
+      ],
+      config: {
+        collectPlaywrightPersistentSnapshots: async ({ accounts, videos }) => {
+          calls.push({ accounts, videos });
+          return {
+            source: "playwright-persistent",
+            collectedAt: "2026-05-21T00:00:00.000Z",
+            videoSnapshots: [],
+            productSnapshots: [],
+            failures: []
+          };
+        }
+      }
+    });
+
+    assert.equal(result.selected.accounts, 1);
+    assert.equal(result.selected.videos, 1);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].accounts.map((account) => account.handle), ["ps_alpha"]);
+    assert.deepEqual(calls[0].videos.map((video) => video.videoUrl), [
+      "https://www.tiktok.com/@ps_alpha/video/1111111111111111111"
+    ]);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("analyzeMonitorData only emits whitelist-account video signals", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-whitelist-analyze-"));
+  try {
+    await mkdir(path.join(dataDir, "snapshots"), { recursive: true });
+    const videoLines = [
+      {
+        collectedAt: "2026-05-20T00:00:00.000Z",
+        postedAt: "2026-05-19T00:00:00.000Z",
+        accountHandle: "ps_alpha",
+        videoUrl: "https://www.tiktok.com/@ps_alpha/video/1111111111111111111",
+        views: 1000,
+        likes: 20,
+        comments: 2,
+        shares: 1
+      },
+      {
+        collectedAt: "2026-05-20T12:00:00.000Z",
+        postedAt: "2026-05-19T00:00:00.000Z",
+        accountHandle: "ps_alpha",
+        videoUrl: "https://www.tiktok.com/@ps_alpha/video/1111111111111111111",
+        views: 15000,
+        likes: 200,
+        comments: 20,
+        shares: 30
+      },
+      {
+        collectedAt: "2026-05-20T00:00:00.000Z",
+        postedAt: "2026-05-19T00:00:00.000Z",
+        accountHandle: "noise_account",
+        videoUrl: "https://www.tiktok.com/@noise_account/video/4444444444444444444",
+        views: 1000,
+        likes: 20,
+        comments: 2,
+        shares: 1
+      },
+      {
+        collectedAt: "2026-05-20T12:00:00.000Z",
+        postedAt: "2026-05-19T00:00:00.000Z",
+        accountHandle: "noise_account",
+        videoUrl: "https://www.tiktok.com/@noise_account/video/4444444444444444444",
+        views: 15000,
+        likes: 200,
+        comments: 20,
+        shares: 30
+      }
+    ];
+    await writeFile(
+      path.join(dataDir, "snapshots", "video_snapshots.jsonl"),
+      videoLines.map((line) => JSON.stringify(line)).join("\n") + "\n"
+    );
+    await writeFile(
+      path.join(dataDir, "snapshots", "shop_product_snapshots.jsonl"),
+      `${JSON.stringify({
+        collectedAt: "2026-05-20T12:00:00.000Z",
+        productUrl: "https://www.tiktok.com/shop/p/example",
+        soldCount: 10,
+        reviewCount: 1,
+        price: 10
+      })}\n`
+    );
+
+    const result = await analyzeMonitorData({
+      dataDir,
+      now: new Date("2026-05-20T12:00:00.000Z"),
+      whitelistAccounts: [
+        {
+          handle: "ps_alpha",
+          enabled: true,
+          skipTracking: false
+        }
+      ],
+      config: {
+        min6hViews: 3000,
+        min24hViews: 10000
+      }
+    });
+
+    assert.equal(result.signals, 1);
+    const signalLog = await readFile(path.join(dataDir, "signals", "signals.jsonl"), "utf8");
+    const signals = signalLog.trim().split("\n").map((line) => JSON.parse(line));
+    assert.equal(signals.length, 1);
+    assert.equal(signals[0].accountHandle, "ps_alpha");
+    assert.equal(signals[0].entityType, "video");
   } finally {
     await rm(dataDir, { recursive: true, force: true });
   }
@@ -443,6 +675,7 @@ test("persistent batch runner advances collection cursor", async () => {
 test("persistent batch runner automatically refreshes a completed plan into a new collection cycle", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-persistent-refresh-"));
   try {
+    const seedVideoUrl = "https://www.tiktok.com/@book_alpha/video/7623225588626590990";
     await mkdir(path.join(dataDir, "seeds"), { recursive: true });
     await writeFile(
       path.join(dataDir, "seeds", "accounts.json"),
@@ -452,7 +685,7 @@ test("persistent batch runner automatically refreshes a completed plan into a ne
           handle: "book_alpha",
           profileUrl: "https://www.tiktok.com/@book_alpha",
           enabled: true,
-          evidenceUrls: ["https://www.tiktok.com/@book_alpha/video/735111"]
+          evidenceUrls: [seedVideoUrl]
         }
       ])
     );
@@ -487,8 +720,9 @@ test("persistent batch runner automatically refreshes a completed plan into a ne
       }
     });
 
-    assert.equal(first.cursor.completed, true);
-    assert.equal(first.batch.videos, 1);
+    assert.equal(first.cursor.completed, false);
+    assert.equal(first.batch.accounts, 1);
+    assert.equal(first.batch.videos, 0);
 
     const second = await runPlaywrightPersistentMonitorBatch({
       dataDir,
@@ -501,9 +735,10 @@ test("persistent batch runner automatically refreshes a completed plan into a ne
     });
 
     assert.equal(second.batch.done, false);
+    assert.equal(second.batch.accounts, 0);
     assert.equal(second.batch.videos, 1);
     assert.equal(second.cursor.videoIndex, 1);
-    assert.equal(second.cursor.accountIndex, 0);
+    assert.equal(second.cursor.accountIndex, 1);
     assert.equal(second.cursor.completed, true);
     assert.equal(second.planned.videoTargets, 1);
   } finally {

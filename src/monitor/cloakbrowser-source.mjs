@@ -3,6 +3,12 @@ import os from "node:os";
 import path from "node:path";
 
 import { collectChromeSnapshots } from "./chrome-source.mjs";
+import {
+  DEFAULT_TIKTOK_DISCOVERY_QUERIES,
+  discoverChromeAccountCandidates
+} from "./discovery.mjs";
+import { createBrightDataFallbackHooks } from "./brightdata-browser-fallback.mjs";
+import { createDokobotFallbackHooks } from "./dokobot-local.mjs";
 import { ensureSeededProfile } from "./playwright-persistent-runtime.mjs";
 
 export async function collectCloakBrowserSnapshots({
@@ -13,24 +19,161 @@ export async function collectCloakBrowserSnapshots({
   videos = [],
   config = {}
 } = {}) {
+  return withCloakBrowserBrowserClient({
+    config,
+    async run(browserClient) {
+      const collectSnapshots = config.collectChromeSnapshots ?? collectChromeSnapshots;
+      const fallbackHooks = await resolveFallbackHooks({ config });
+      const effectiveConfig = fallbackHooks
+        ? {
+            ...config,
+            ...fallbackHooks
+          }
+        : config;
+      const collection = await collectSnapshots({
+        now,
+        maxTabs,
+        browserClient,
+        accounts,
+        shops,
+        videos,
+        config: effectiveConfig
+      });
+
+      return {
+        ...collection,
+        source: "cloakbrowser",
+        videoSnapshots: collection.videoSnapshots.map((snapshot) => ({
+          ...snapshot,
+          source: "cloakbrowser"
+        })),
+        productSnapshots: collection.productSnapshots.map((snapshot) => ({
+          ...snapshot,
+          source: "cloakbrowser"
+        }))
+      };
+    }
+  });
+}
+
+async function resolveFallbackHooks({ config = {} } = {}) {
+  const hookSets = [];
+
+  const brightDataHooks = await resolveBrightDataFallbackHooks({ config });
+  if (brightDataHooks) hookSets.push(brightDataHooks);
+
+  const dokobotHooks = await resolveDokobotFallbackHooks({ config });
+  if (dokobotHooks) hookSets.push(dokobotHooks);
+
+  if (hookSets.length === 0) return null;
+
+  return {
+    extractProfileVideosFallback: composeFallbackChain(hookSets, "extractProfileVideosFallback"),
+    extractDirectVideoFallback: composeFallbackChain(hookSets, "extractDirectVideoFallback")
+  };
+}
+
+async function resolveBrightDataFallbackHooks({ config = {} } = {}) {
+  if (config.brightDataFallback !== true) return null;
+  const factory = config.createBrightDataFallbackHooks ?? createBrightDataFallbackHooks;
+  try {
+    return await factory(config);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveDokobotFallbackHooks({ config = {} } = {}) {
+  if (config.dokobotFallback === false) return null;
+  if (config.dokobotFallback !== true && isInjectedCloakTestConfig(config)) return null;
+  const factory = config.createDokobotFallbackHooks ?? createDokobotFallbackHooks;
+  try {
+    return await factory(config);
+  } catch {
+    return null;
+  }
+}
+
+function composeFallbackChain(hookSets = [], hookName) {
+  const handlers = hookSets
+    .map((hooks) => hooks?.[hookName])
+    .filter((handler) => typeof handler === "function");
+
+  if (handlers.length === 0) return undefined;
+
+  return async (payload) => {
+    let currentResult = payload?.primaryResult;
+    for (const handler of handlers) {
+      let nextResult;
+      try {
+        nextResult = await handler({
+          ...payload,
+          primaryResult: currentResult
+        });
+      } catch {
+        continue;
+      }
+      if (nextResult?.status === "ok") {
+        return nextResult;
+      }
+      currentResult = nextResult ?? currentResult;
+    }
+    return currentResult;
+  };
+}
+
+function isInjectedCloakTestConfig(config = {}) {
+  return Boolean(
+    config.launchCloakBrowserPersistentContext ||
+      config.createPlaywrightBrowserClient ||
+      config.collectChromeSnapshots
+  );
+}
+
+export async function discoverCloakBrowserAccountCandidates({
+  dataDir = "monitoring_data",
+  now = new Date(),
+  queries = DEFAULT_TIKTOK_DISCOVERY_QUERIES,
+  config = {}
+} = {}) {
+  return withCloakBrowserBrowserClient({
+    config,
+    async run(browserClient) {
+      return discoverChromeAccountCandidates({
+        dataDir,
+        browserClient,
+        queries,
+        now,
+        maxTabs: numberOrDefault(config.maxTabs, 1),
+        queryTimeoutMs: numberOrDefault(config.queryTimeoutMs, 45_000),
+        profileTimeoutMs: numberOrDefault(config.profileTimeoutMs, 15_000)
+      });
+    }
+  });
+}
+
+async function withCloakBrowserBrowserClient({ config = {}, run }) {
   const launchPersistentContext =
     config.launchCloakBrowserPersistentContext ?? (await loadCloakBrowserLaunchPersistentContext(config.cloakbrowserRuntimeModule));
   const createBrowserClient =
     config.createPlaywrightBrowserClient ?? (await loadCreatePlaywrightBrowserClient());
-  const collectSnapshots = config.collectChromeSnapshots ?? collectChromeSnapshots;
   const profiles = resolveCloakBrowserProfiles(config);
+  const runProfileDir = shouldUseEphemeralRunProfile(config)
+    ? createEphemeralRunProfileDir(profiles.runProfileDir)
+    : profiles.runProfileDir;
+  const cleanupRunProfileDir = runProfileDir !== profiles.runProfileDir ? runProfileDir : null;
 
   if (config.cloakbrowserFresh ?? true) {
-    fs.rmSync(profiles.runProfileDir, { recursive: true, force: true });
+    fs.rmSync(runProfileDir, { recursive: true, force: true });
   }
   ensureSeededProfile({
-    profileDir: profiles.runProfileDir,
+    profileDir: runProfileDir,
     seedProfileDir: profiles.seedProfileDir,
     sourceProfileDir: profiles.sourceProfileDir
   });
 
   const context = await launchPersistentContext({
-    userDataDir: profiles.runProfileDir,
+    userDataDir: runProfileDir,
     headless: config.cloakbrowserHeadless === false ? false : true,
     humanize: Boolean(config.cloakbrowserHumanize ?? true),
     humanPreset: config.cloakbrowserHumanPreset ?? "careful",
@@ -45,7 +188,7 @@ export async function collectCloakBrowserSnapshots({
   try {
     const browserClient = createBrowserClient({
       context,
-      maxVideosPerAccount: numberOrDefault(config.maxVideosPerAccount, 60),
+      maxVideosPerAccount: numberOrDefault(config.maxVideosPerAccount, 120),
       maxProductsPerShop: numberOrDefault(config.maxProductsPerShop, 6),
       waitUntil: config.waitUntil ?? "domcontentloaded",
       timeoutMs: numberOrDefault(config.timeoutMs, 15_000),
@@ -62,30 +205,12 @@ export async function collectCloakBrowserSnapshots({
       preSnapshotScrollMinY: numberOrDefault(config.cloakbrowserPreSnapshotScrollMinY, 240),
       preSnapshotScrollMaxY: numberOrDefault(config.cloakbrowserPreSnapshotScrollMaxY, 720)
     });
-
-    const collection = await collectSnapshots({
-      now,
-      maxTabs,
-      browserClient,
-      accounts,
-      shops,
-      videos
-    });
-
-    return {
-      ...collection,
-      source: "cloakbrowser",
-      videoSnapshots: collection.videoSnapshots.map((snapshot) => ({
-        ...snapshot,
-        source: "cloakbrowser"
-      })),
-      productSnapshots: collection.productSnapshots.map((snapshot) => ({
-        ...snapshot,
-        source: "cloakbrowser"
-      }))
-    };
+    return await run(browserClient);
   } finally {
     await context?.close?.();
+    if (cleanupRunProfileDir) {
+      fs.rmSync(cleanupRunProfileDir, { recursive: true, force: true });
+    }
   }
 }
 
@@ -137,12 +262,12 @@ function resolveCloakBrowserRuntimeModule(explicitModulePath) {
   if (explicitModulePath) candidates.push(explicitModulePath);
 
   const homeDir = os.homedir();
-  candidates.push(path.join(homeDir, "plugins", "cloakbrowser", "node_modules", "cloakbrowser"));
+  candidates.push(path.join(homeDir, "plugins", "cloakbrowser", "node_modules", "cloakbrowser", "dist", "index.js"));
 
   const cacheRoot = path.join(homeDir, ".codex", "plugins", "cache", "local-codex-plugins", "cloakbrowser");
   if (fs.existsSync(cacheRoot)) {
     for (const version of fs.readdirSync(cacheRoot)) {
-      candidates.push(path.join(cacheRoot, version, "node_modules", "cloakbrowser"));
+      candidates.push(path.join(cacheRoot, version, "node_modules", "cloakbrowser", "dist", "index.js"));
     }
   }
   candidates.push("cloakbrowser");
@@ -169,4 +294,15 @@ function numberOrDefault(value, fallback) {
 
 function formatLoadError(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function shouldUseEphemeralRunProfile(config = {}) {
+  return config.cloakbrowserEphemeral ?? true;
+}
+
+function createEphemeralRunProfileDir(baseDir) {
+  const normalizedBase = path.resolve(baseDir);
+  const parentDir = path.dirname(normalizedBase);
+  const baseName = path.basename(normalizedBase);
+  return path.join(parentDir, `${baseName}-task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 }

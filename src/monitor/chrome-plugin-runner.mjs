@@ -166,7 +166,7 @@ export async function buildChromePluginMonitorPlan({
 
 function buildChromePluginBrowserClientConfig(config = {}) {
   return {
-    maxVideosPerAccount: numberOrDefault(config.maxVideosPerAccount, 60),
+    maxVideosPerAccount: numberOrDefault(config.maxVideosPerAccount, 120),
     maxProductsPerShop: numberOrDefault(config.maxProductsPerShop, 6),
     waitUntil: config.waitUntil ?? "domcontentloaded",
     timeoutMs: numberOrDefault(config.timeoutMs, 15_000),

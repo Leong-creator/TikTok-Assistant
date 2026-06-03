@@ -1,0 +1,3802 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TikTok 同行爆点雷达</title>
+    <style>
+      :root {
+        --bg: #f6f2ea;
+        --bg-2: #fbf8f3;
+        --ink: #191714;
+        --muted: #72695f;
+        --line: rgba(25, 23, 20, 0.08);
+        --line-strong: rgba(25, 23, 20, 0.14);
+        --card: rgba(255, 255, 255, 0.84);
+        --blue: #2563eb;
+        --hot: #dc2626;
+        --mint: #059669;
+        --violet: #7c3aed;
+        --warm: #c2410c;
+        --gold: #c99b3e;
+        --shadow: 0 20px 56px rgba(25, 23, 20, 0.08);
+        --radius-xl: 30px;
+        --radius-lg: 24px;
+        --radius-md: 18px;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 28%),
+          radial-gradient(circle at top right, rgba(220, 38, 38, 0.08), transparent 24%),
+          linear-gradient(180deg, #fcfaf6 0%, var(--bg) 100%);
+        font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      a { color: var(--blue); text-decoration: none; }
+
+      .shell {
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 18px 22px 48px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .hero-main,
+      .panel {
+        background: var(--card);
+        border: 1px solid rgba(255, 255, 255, 0.85);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-main {
+        border-radius: var(--radius-xl);
+        padding: 10px 14px 10px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .hero-topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: end;
+      }
+
+      .hero-copy {
+        min-width: 0;
+        display: grid;
+        gap: 3px;
+        max-width: 90ch;
+      }
+
+      .hero-status-rail {
+        min-width: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 0;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(22px, 2.25vw, 29px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .headline {
+        margin-top: 2px;
+        padding: 6px 8px;
+        border-radius: 12px;
+        background: linear-gradient(90deg, rgba(220,38,38,0.08), rgba(124,58,237,0.05));
+        color: var(--ink);
+        font-size: 11px;
+        line-height: 1.25;
+        font-weight: 700;
+      }
+
+      .hero-brief {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        align-items: stretch;
+      }
+
+      .hero-lead {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 15px;
+        padding: 7px 10px;
+        background: rgba(255,255,255,0.78);
+        border: 1px solid rgba(25,23,20,0.05);
+      }
+
+      .hero-lead strong {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-lead span {
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .hero-cues {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+      }
+
+      .hero-cue {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 2px 8px;
+        align-items: center;
+        border-radius: 15px;
+        padding: 8px 10px;
+        background: rgba(255,255,255,0.88);
+        border: 1px solid rgba(25,23,20,0.05);
+        min-width: 0;
+      }
+
+      .hero-cue strong {
+        grid-column: 1 / 2;
+        grid-row: 1 / 2;
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        align-self: start;
+      }
+
+      .hero-cue span {
+        grid-column: 1 / 2;
+        min-width: 0;
+        font-size: 13px;
+        line-height: 1.15;
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      .hero-cue small {
+        grid-column: 1 / 2;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.2;
+      }
+
+      .hero-cue a {
+        grid-column: 2 / 3;
+        grid-row: 1 / 4;
+        align-self: center;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .morning-brief {
+        margin-top: 10px;
+        padding: 12px 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.72);
+        border: 1px solid rgba(25,23,20,0.06);
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 13px;
+      }
+
+      .morning-brief strong {
+        color: var(--ink);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding-top: 2px;
+        border-top: 1px solid rgba(25,23,20,0.06);
+      }
+
+      .summary-pill {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border-radius: 16px;
+        padding: 5px 8px;
+        background: rgba(255,255,255,0.68);
+        border: 1px solid rgba(25,23,20,0.05);
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .summary-pill strong {
+        color: var(--ink);
+        font-size: 9px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 7px 11px;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--ink);
+        background: rgba(25, 23, 20, 0.06);
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+
+      .chip:hover,
+      .chip.is-active {
+        background: rgba(37, 99, 235, 0.10);
+        border-color: rgba(37, 99, 235, 0.12);
+      }
+
+      .hero-topline {
+        display: grid;
+        grid-template-columns: 1fr 0.96fr;
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .hero-status,
+      .hero-focus {
+        border-radius: 20px;
+        padding: 12px 14px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.72);
+      }
+
+      .hero-status h2,
+      .hero-focus h2 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        letter-spacing: -0.02em;
+      }
+
+      .hero-status {
+        background:
+          radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 36%),
+          rgba(255,255,255,0.74);
+      }
+
+      .meta-block {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .meta-block strong {
+        display: block;
+        color: var(--ink);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 3px;
+      }
+
+      .meta-block a {
+        color: var(--blue);
+        text-decoration: underline;
+      }
+
+      .signal-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .situation-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 0;
+      }
+
+      .situation-item {
+        border-radius: 18px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.78);
+        padding: 10px 12px;
+      }
+
+      .situation-item strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+        color: var(--ink);
+      }
+
+      .situation-item span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .signal-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 4px 7px;
+        background: rgba(25,23,20,0.05);
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .signal-pill strong {
+        color: var(--ink);
+        letter-spacing: 0;
+        text-transform: none;
+        font-size: 12px;
+        margin: 0;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin: 18px 0 20px;
+      }
+
+      .card {
+        position: relative;
+        overflow: hidden;
+        background: var(--card);
+        border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.88);
+        box-shadow: var(--shadow);
+        padding: 16px 18px;
+        grid-column: span 1;
+      }
+
+      .card--secondary {
+        padding: 14px 16px 12px;
+      }
+
+      .card--primary {
+        min-height: 150px;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 6px;
+        background: currentColor;
+        opacity: 0.14;
+      }
+
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: auto -18px -24px auto;
+        width: 86px;
+        height: 86px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0.08;
+      }
+
+      .card[data-tone="hot"] { color: var(--hot); }
+      .card[data-tone="blue"] { color: var(--blue); }
+      .card[data-tone="mint"] { color: var(--mint); }
+      .card[data-tone="violet"] { color: var(--violet); }
+      .card[data-tone="warm"] { color: var(--warm); }
+
+      .card-label { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+      .card-value { font-size: clamp(28px, 3vw, 42px); font-weight: 700; letter-spacing: -0.05em; }
+      .card-summary {
+        margin-top: 8px;
+        color: var(--ink);
+        font-size: 19px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1.3;
+      }
+      .card-meta {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.5;
+      }
+      .card-kicker {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: rgba(25,23,20,0.05);
+        color: var(--ink);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        margin-bottom: 10px;
+      }
+      .card-link {
+        display: inline-flex;
+        margin-top: 10px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .battle-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .battle-main,
+      .battle-side {
+        display: grid;
+        gap: 16px;
+      }
+
+      .full-width {
+        margin-bottom: 18px;
+      }
+
+      .panel {
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+
+      #must-watch-panel,
+      #theme-opportunity-panel {
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.94), rgba(255,255,255,0.82)),
+          rgba(255,255,255,0.84);
+        box-shadow: 0 24px 54px rgba(25, 23, 20, 0.08);
+      }
+
+      #must-watch-panel {
+        border: 1px solid rgba(220,38,38,0.12);
+      }
+
+      #theme-opportunity-panel {
+        border: 1px solid rgba(124,58,237,0.12);
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+        padding: 16px 18px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title { margin: 0; font-size: 23px; letter-spacing: -0.05em; }
+      .panel-kicker {
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+      .panel-sub { color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+      #must-watch-panel .panel-head,
+      #theme-opportunity-panel .panel-head {
+        padding: 18px 20px 12px;
+      }
+
+      #must-watch-panel .panel-head {
+        background:
+          linear-gradient(180deg, rgba(255,248,248,0.78), rgba(255,255,255,0));
+      }
+
+      #theme-opportunity-panel .panel-head {
+        background:
+          linear-gradient(180deg, rgba(249,245,255,0.82), rgba(255,255,255,0));
+      }
+
+      #must-watch-panel .panel-kicker,
+      #theme-opportunity-panel .panel-kicker {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 9px;
+        border-radius: 999px;
+        margin-bottom: 8px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+      }
+
+      #must-watch-panel .panel-kicker {
+        color: var(--hot);
+        background: rgba(220,38,38,0.08);
+      }
+
+      #theme-opportunity-panel .panel-kicker {
+        color: var(--violet);
+        background: rgba(124,58,237,0.08);
+      }
+
+      #must-watch-panel .panel-title,
+      #theme-opportunity-panel .panel-title {
+        font-size: 26px;
+      }
+
+      #must-watch-panel .panel-sub,
+      #theme-opportunity-panel .panel-sub {
+        max-width: 34ch;
+        font-size: 11px;
+      }
+
+      .panel--support .panel-head {
+        padding: 14px 16px 9px;
+      }
+
+      .panel--support .panel-title {
+        font-size: 20px;
+      }
+
+      .panel--support .panel-sub {
+        font-size: 11px;
+      }
+
+      .panel--support .list,
+      .panel--support .compact-board {
+        padding-top: 10px;
+      }
+
+      .panel-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: rgba(124,58,237,0.08);
+        color: var(--violet);
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .panel-tools {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .action-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        padding: 14px 18px 16px;
+      }
+
+      .action-card {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        border-radius: 20px;
+        padding: 14px 14px 12px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.66);
+      }
+
+      .action-card[data-tone="hot"] { border-color: rgba(220,38,38,0.12); }
+      .action-card[data-tone="mint"] { border-color: rgba(5,150,105,0.12); }
+      .action-card[data-tone="violet"] { border-color: rgba(124,58,237,0.12); }
+      .action-card[data-tone="warm"] { border-color: rgba(194,65,12,0.12); }
+
+      .action-card h3 {
+        margin: 0 0 4px;
+        font-size: 22px;
+        letter-spacing: -0.02em;
+      }
+
+      .action-summary {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        margin-bottom: 8px;
+        background: rgba(25,23,20,0.06);
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .action-copy {
+        min-width: 0;
+      }
+
+      .action-step {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 88px;
+        margin-bottom: 8px;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: rgba(25,23,20,0.06);
+        color: var(--ink);
+      }
+
+      .action-card p {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .action-card .why {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .action-emphasis {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(25,23,20,0.06);
+      }
+
+      .action-emphasis strong {
+        font-size: 24px;
+        letter-spacing: -0.04em;
+        color: var(--ink);
+      }
+
+      .action-metric {
+        display: grid;
+        gap: 2px;
+      }
+
+      .action-metric .subtle {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .action-cta {
+        font-weight: 700;
+      }
+
+      .action-emphasis span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .list { padding: 12px 16px 18px; }
+      .rank-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .leaderboard {
+        display: grid;
+        gap: 10px;
+      }
+
+      .leaderboard-hero {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr) 168px;
+        gap: 14px;
+        align-items: start;
+        padding: 18px 18px 16px;
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.76));
+        border: 1px solid rgba(25,23,20,0.08);
+        box-shadow: 0 24px 48px rgba(25, 23, 20, 0.08);
+        position: relative;
+        overflow: hidden;
+      }
+
+      #must-watch-panel .leaderboard-hero,
+      #theme-opportunity-panel .leaderboard-hero {
+        box-shadow:
+          0 26px 58px rgba(25, 23, 20, 0.09),
+          inset 0 1px 0 rgba(255,255,255,0.7);
+      }
+
+      .leaderboard-hero h3 {
+        margin: 0 0 7px;
+        font-size: 33px;
+        letter-spacing: -0.05em;
+        line-height: 0.94;
+      }
+
+      #must-watch-panel .leaderboard-hero {
+        background:
+          radial-gradient(circle at top right, rgba(220,38,38,0.10), transparent 34%),
+          linear-gradient(180deg, rgba(255,247,247,0.96), rgba(255,255,255,0.82));
+      }
+
+      #theme-opportunity-panel .leaderboard-hero {
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.10), transparent 34%),
+          linear-gradient(180deg, rgba(248,244,255,0.96), rgba(255,255,255,0.82));
+      }
+
+      .leaderboard-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 6px;
+        background: rgba(25,23,20,0.14);
+      }
+
+      #must-watch-panel .leaderboard-hero::before {
+        background: rgba(220,38,38,0.32);
+      }
+
+      #theme-opportunity-panel .leaderboard-hero::before {
+        background: rgba(124,58,237,0.32);
+      }
+
+      .leaderboard-followups {
+        display: grid;
+        gap: 7px;
+      }
+
+      .compact-board {
+        display: grid;
+        gap: 8px;
+      }
+
+      .compact-hero {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: start;
+        padding: 12px 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(25,23,20,0.06);
+      }
+
+      .compact-hero .rank-badge {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        font-size: 16px;
+      }
+
+      .compact-hero h3 {
+        margin: 0 0 5px;
+        font-size: 18px;
+        letter-spacing: -0.03em;
+      }
+
+      .compact-hero .tags,
+      .compact-hero .metrics {
+        gap: 6px;
+        margin-bottom: 5px;
+      }
+
+      .compact-hero .tag {
+        padding: 3px 8px;
+        font-size: 11px;
+      }
+
+      .compact-hero .metric {
+        font-size: 12px;
+      }
+
+      .compact-hero .leaderboard-directive {
+        margin-top: 6px;
+        padding: 7px 8px;
+      }
+
+      .compact-hero .leaderboard-links {
+        margin-top: 6px;
+      }
+
+      .compact-side {
+        min-width: 112px;
+        display: grid;
+        gap: 6px;
+        justify-items: end;
+      }
+
+      .compact-side .highlight-metric {
+        padding: 8px 9px 7px;
+        border-radius: 12px;
+      }
+
+      .compact-side .highlight-metric strong {
+        font-size: 18px;
+      }
+
+      .compact-followups {
+        display: grid;
+        gap: 6px;
+      }
+
+      .compact-row {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 10px;
+        border-radius: 14px;
+        background: rgba(255,255,255,0.68);
+        border: 1px solid rgba(25,23,20,0.05);
+      }
+
+      .compact-row .rank-badge {
+        width: 30px;
+        height: 30px;
+        border-radius: 11px;
+        font-size: 13px;
+      }
+
+      .compact-row strong {
+        display: block;
+        margin-bottom: 2px;
+        font-size: 13px;
+      }
+
+      .compact-row .row-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .compact-row .row-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 2px 7px;
+        font-size: 10px;
+        color: var(--muted);
+        background: rgba(25,23,20,0.05);
+      }
+
+      .compact-row .mini-metric {
+        text-align: right;
+      }
+
+      .compact-row .mini-metric strong {
+        margin: 0;
+        font-size: 16px;
+        letter-spacing: -0.03em;
+      }
+
+      .compact-row .mini-metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .leaderboard-row {
+        display: grid;
+        grid-template-columns: 40px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.68);
+        border: 1px solid rgba(25,23,20,0.05);
+      }
+
+      #must-watch-panel .leaderboard-row {
+        background: rgba(255,250,250,0.78);
+      }
+
+      #theme-opportunity-panel .leaderboard-row {
+        background: rgba(250,247,255,0.78);
+      }
+
+      .leaderboard-row .rank-badge {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        font-size: 16px;
+      }
+
+      .leaderboard-row strong {
+        display: block;
+        margin-bottom: 2px;
+        font-size: 14px;
+      }
+
+      .leaderboard-row span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .leaderboard-row .row-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 4px;
+      }
+
+      .leaderboard-row .row-links,
+      .compact-row .row-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 5px;
+      }
+
+      .leaderboard-row .row-links a,
+      .compact-row .row-links a {
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .leaderboard-main {
+        display: grid;
+        gap: 8px;
+      }
+
+      .leaderboard-row .row-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 11px;
+        color: var(--muted);
+        background: rgba(25,23,20,0.05);
+      }
+
+      .leaderboard-row .mini-metric {
+        text-align: right;
+      }
+
+      .leaderboard-row .mini-metric strong {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.03em;
+      }
+
+      .leaderboard-row .mini-metric span {
+        display: block;
+      }
+
+      .leaderboard-directive {
+        display: grid;
+        gap: 3px;
+        margin: 6px 0 0;
+        padding: 8px 9px;
+        border-radius: 13px;
+        background: rgba(25,23,20,0.045);
+      }
+
+      .leaderboard-directive strong {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .leaderboard-directive span {
+        color: var(--ink);
+        font-size: 11px;
+        line-height: 1.3;
+        font-weight: 600;
+      }
+
+      .leaderboard-role {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        margin-bottom: 8px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(220,38,38,0.10);
+        color: var(--hot);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .leaderboard-role--violet {
+        background: rgba(124,58,237,0.10);
+        color: var(--violet);
+      }
+
+      .leaderboard-battle-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 2px 0 0;
+      }
+
+      .battle-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(25,23,20,0.05);
+        color: var(--ink);
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .battle-pill span {
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .leaderboard-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .leaderboard-links a {
+        font-weight: 700;
+      }
+
+      .leaderboard-hookline {
+        margin: 0;
+        color: var(--ink);
+        font-size: 12px;
+        line-height: 1.34;
+        font-weight: 800;
+      }
+      .rank-card {
+        display: grid;
+        grid-template-columns: 54px 1fr auto;
+        gap: 14px;
+        align-items: start;
+        padding: 14px 14px 12px;
+        border-radius: 22px;
+        background: rgba(255,255,255,0.74);
+        border: 1px solid rgba(25,23,20,0.06);
+      }
+
+      .rank-badge {
+        width: 50px;
+        height: 50px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        background: rgba(25, 23, 20, 0.06);
+        font-weight: 700;
+        font-size: 19px;
+      }
+
+      .rank-card h3 { margin: 0 0 6px; font-size: 17px; letter-spacing: -0.02em; }
+      .tags, .metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        background: rgba(25, 23, 20, 0.06);
+      }
+      .metric {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .item p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .rank-side {
+        min-width: 168px;
+        display: grid;
+        gap: 8px;
+        justify-items: end;
+        padding: 8px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.76);
+        border: 1px solid rgba(25,23,20,0.04);
+      }
+
+      .highlight-metric {
+        text-align: right;
+        width: 100%;
+        border-radius: 16px;
+        padding: 14px 12px 12px;
+        background: rgba(255,255,255,0.86);
+        border: 1px solid rgba(25,23,20,0.05);
+      }
+
+      #must-watch-panel .rank-side {
+        background: rgba(255,250,250,0.74);
+      }
+
+      #must-watch-panel .highlight-metric:first-child {
+        background: rgba(220,38,38,0.08);
+      }
+
+      #theme-opportunity-panel .rank-side {
+        background: rgba(250,247,255,0.74);
+      }
+
+      #theme-opportunity-panel .highlight-metric:first-child {
+        background: rgba(124,58,237,0.08);
+      }
+
+      .highlight-metric strong {
+        display: block;
+        font-size: 24px;
+        letter-spacing: -0.04em;
+        color: var(--ink);
+      }
+
+      .highlight-metric span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .theme-opportunity-grid,
+      .competitor-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 12px 16px 16px;
+      }
+
+      .side-board {
+        display: grid;
+        gap: 10px;
+      }
+
+      .side-board-hero {
+        border-radius: 22px;
+        padding: 14px 14px 12px;
+        border: 1px solid rgba(25,23,20,0.08);
+        background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(255,255,255,0.74));
+      }
+
+      .side-board-hero .action-step {
+        margin-bottom: 8px;
+      }
+
+      .side-board-hero h3 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+      }
+
+      .side-board-hero p {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .side-board-followups {
+        display: grid;
+        gap: 8px;
+      }
+
+      .side-board-row {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 12px 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.68);
+        border: 1px solid rgba(25,23,20,0.05);
+      }
+
+      .side-board-row .rank-badge {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        font-size: 16px;
+      }
+
+      .side-board-row strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 15px;
+      }
+
+      .side-board-row span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .big-grid {
+        display: grid;
+        grid-template-columns: 1.06fr 0.94fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .tab-shell {
+        display: grid;
+        gap: 0;
+      }
+
+      .tab-bar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 0 22px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tab-button {
+        border: 0;
+        background: rgba(25, 23, 20, 0.06);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 11px 16px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .tab-button.is-active {
+        background: rgba(37, 99, 235, 0.12);
+        color: var(--blue);
+      }
+
+      .tab-panel {
+        display: none;
+      }
+
+      .tab-panel.is-active {
+        display: block;
+      }
+
+      .selector-shelf {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        padding: 0 22px 14px;
+        scrollbar-width: thin;
+      }
+
+      .selector-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 14px;
+        padding: 0 22px 12px;
+      }
+
+      .selector-head strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 18px;
+        letter-spacing: -0.03em;
+      }
+
+      .selector-head strong::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 8px;
+        border-radius: 999px;
+        background: rgba(124,58,237,0.28);
+        vertical-align: middle;
+      }
+
+      .selector-head span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .selector-card {
+        min-width: 240px;
+        max-width: 280px;
+        background: rgba(255,255,255,0.74);
+        border: 1px solid rgba(25,23,20,0.06);
+        border-radius: 18px;
+        padding: 12px 13px 10px;
+        text-align: left;
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+      }
+
+      .selector-card:hover,
+      .selector-card.is-active {
+        transform: translateY(-1px);
+        border-color: rgba(37,99,235,0.16);
+        box-shadow: 0 14px 30px rgba(37,99,235,0.08);
+        background: rgba(244,248,255,0.92);
+      }
+
+      .selector-card strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 15px;
+      }
+
+      .selector-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .selector-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 7px;
+      }
+
+      .selector-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 8px;
+        background: rgba(25,23,20,0.05);
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .selector-card small {
+        display: block;
+        margin-top: 6px;
+        color: var(--ink);
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.45;
+      }
+
+      .selector-stage {
+        display: inline-flex;
+        align-items: center;
+        margin-bottom: 7px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(25,23,20,0.05);
+        color: var(--ink);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      .selector-note {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.4;
+      }
+
+      #themeShelf .selector-card {
+        min-width: 260px;
+        max-width: 320px;
+        padding: 13px 14px 12px;
+        border-color: rgba(124,58,237,0.08);
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.06), transparent 36%),
+          rgba(255,255,255,0.84);
+      }
+
+      #themeShelf .selector-card strong::before {
+        content: "专题";
+        display: inline-flex;
+        align-items: center;
+        margin-right: 6px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: rgba(124,58,237,0.10);
+        color: var(--violet);
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        vertical-align: middle;
+      }
+
+      #themeShelf .selector-stage {
+        background: rgba(124,58,237,0.10);
+        color: var(--violet);
+      }
+
+      .detail {
+        padding: 16px 22px 24px;
+      }
+
+      .theme-spotlight {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: start;
+        margin-bottom: 12px;
+        padding: 12px 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(124,58,237,0.10);
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.08), transparent 34%),
+          rgba(255,255,255,0.84);
+        box-shadow: 0 16px 32px rgba(124,58,237,0.05);
+      }
+
+      .theme-spotlight strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 15px;
+        letter-spacing: -0.02em;
+      }
+
+      .theme-spotlight p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .theme-spotlight-copy {
+        display: grid;
+        gap: 8px;
+      }
+
+      .theme-spotlight-kicker {
+        display: inline-flex;
+        align-items: center;
+        margin-bottom: 5px;
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: rgba(124,58,237,0.10);
+        color: var(--violet);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .theme-spotlight-dossier {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .theme-dossier-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 9px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.8);
+        border: 1px solid rgba(124,58,237,0.10);
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .theme-dossier-pill strong {
+        margin: 0;
+        font-size: 10px;
+        color: var(--ink);
+        letter-spacing: 0;
+      }
+
+      .theme-spotlight-note {
+        border-radius: 16px;
+        padding: 8px 10px;
+        background: rgba(25,23,20,0.04);
+      }
+
+      .theme-spotlight-directive {
+        display: grid;
+        gap: 2px;
+        padding: 8px 10px;
+        border-radius: 16px;
+        border: 1px solid rgba(124,58,237,0.08);
+        background: rgba(255,255,255,0.7);
+      }
+
+      .theme-spotlight-directive strong {
+        margin: 0;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--violet);
+      }
+
+      .theme-spotlight-directive span {
+        color: var(--ink);
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 700;
+      }
+
+      .theme-spotlight-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .theme-spotlight-links a {
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .theme-flow-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin: 0 0 12px;
+      }
+
+      .theme-flow-card {
+        border-radius: 16px;
+        padding: 10px 11px;
+        background: rgba(255,255,255,0.82);
+        border: 1px solid rgba(124,58,237,0.08);
+        box-shadow: 0 12px 26px rgba(124,58,237,0.04);
+      }
+
+      .theme-flow-card--lead {
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.10), transparent 42%),
+          rgba(255,255,255,0.9);
+      }
+
+      .theme-flow-card strong {
+        display: block;
+        margin: 0 0 4px;
+        font-size: 12px;
+        letter-spacing: -0.02em;
+      }
+
+      .theme-flow-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+        margin-bottom: 6px;
+      }
+
+      .theme-flow-card a {
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .theme-spotlight-metrics {
+        display: grid;
+        gap: 7px;
+        min-width: 148px;
+      }
+
+      .theme-spotlight-metric {
+        border-radius: 14px;
+        padding: 7px 9px;
+        background: rgba(255,255,255,0.82);
+        border: 1px solid rgba(25,23,20,0.05);
+        text-align: right;
+      }
+
+      .theme-spotlight-metric strong {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: -0.04em;
+      }
+
+      .theme-spotlight-metric span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 18px;
+        margin-bottom: 14px;
+      }
+
+      .detail-header h3 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        letter-spacing: -0.04em;
+      }
+
+      .result-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .result-summary {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .result-pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(25,23,20,0.05);
+      }
+
+      .detail-scroll {
+        max-height: 620px;
+        overflow: auto;
+        border-top: 1px solid var(--line);
+      }
+
+      .featured-block {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .featured-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .featured-head strong {
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .featured-head span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .catalog-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0 10px;
+        border-top: 1px solid var(--line);
+        margin-top: 2px;
+      }
+
+      .catalog-head strong {
+        font-size: 15px;
+        letter-spacing: -0.02em;
+      }
+
+      .catalog-head small {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .catalog-head span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .featured-shelf {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+        gap: 10px;
+      }
+
+      .featured-followups {
+        display: grid;
+        gap: 10px;
+      }
+
+      .feature-card {
+        border-radius: 18px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.82);
+        padding: 14px 14px 12px;
+        box-shadow: 0 14px 30px rgba(25,23,20,0.04);
+      }
+
+      .feature-card--signal {
+        border-color: rgba(220,38,38,0.16);
+        background:
+          radial-gradient(circle at top right, rgba(220,38,38,0.08), transparent 36%),
+          rgba(255,255,255,0.9);
+      }
+
+      .feature-card--strong {
+        border-color: rgba(37,99,235,0.14);
+        background:
+          radial-gradient(circle at top right, rgba(37,99,235,0.08), transparent 36%),
+          rgba(255,255,255,0.9);
+      }
+
+      .feature-card--hero {
+        padding: 20px 20px 18px;
+        border-radius: 24px;
+        box-shadow: 0 20px 40px rgba(25,23,20,0.07);
+      }
+
+      .feature-card--hero .feature-card-head {
+        margin-bottom: 12px;
+      }
+
+      .feature-card--hero h4 {
+        font-size: 20px;
+      }
+
+      .feature-card--hero .video-card-stats {
+        margin-bottom: 10px;
+      }
+
+      .feature-card--hero .feature-card-copy {
+        font-size: 12px;
+      }
+
+      .feature-card--hero .feature-card-rank {
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+        font-size: 18px;
+      }
+
+      .feature-mini {
+        display: grid;
+        grid-template-columns: 40px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        border-radius: 18px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.76);
+        padding: 12px 14px;
+      }
+
+      #themeFeatured .feature-card--hero {
+        border-color: rgba(124,58,237,0.16);
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.08), transparent 34%),
+          rgba(255,255,255,0.92);
+      }
+
+      #themeFeatured .feature-mini {
+        background: rgba(250,247,255,0.84);
+        border-color: rgba(124,58,237,0.08);
+      }
+
+      .feature-mini--signal {
+        border-color: rgba(220,38,38,0.14);
+        background: rgba(255,249,249,0.82);
+      }
+
+      .feature-mini--strong {
+        border-color: rgba(37,99,235,0.12);
+        background: rgba(248,251,255,0.84);
+      }
+
+      .feature-mini .feature-card-rank {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        font-size: 15px;
+      }
+
+      .feature-mini strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 15px;
+      }
+
+      .feature-mini span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .feature-mini .mini-metric {
+        text-align: right;
+      }
+
+      .feature-mini .mini-metric strong {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.03em;
+      }
+
+      .feature-mini .mini-metric span {
+        display: block;
+      }
+
+      .feature-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .feature-card-rank {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        background: rgba(25,23,20,0.06);
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .feature-card h4 {
+        margin: 0;
+        font-size: 16px;
+        letter-spacing: -0.02em;
+      }
+
+      .feature-role {
+        display: inline-flex;
+        align-items: center;
+        margin-bottom: 6px;
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: rgba(25,23,20,0.06);
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      #themeFeatured .feature-role {
+        background: rgba(124,58,237,0.10);
+        color: var(--violet);
+      }
+
+      .feature-card-copy {
+        margin: 0 0 10px;
+        color: var(--ink);
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 600;
+      }
+
+      .feature-card .video-card-meta,
+      .feature-card .video-card-stats {
+        margin-bottom: 8px;
+      }
+
+      .video-wall {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px 0 2px;
+      }
+
+      .video-card {
+        border: 1px solid rgba(25,23,20,0.06);
+        border-radius: 18px;
+        background: rgba(255,255,255,0.76);
+        padding: 9px 10px 8px;
+      }
+
+      .detail-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 10px 0 0;
+      }
+
+      .detail-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(25,23,20,0.05);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .video-card--signal {
+        border-color: rgba(220,38,38,0.18);
+        box-shadow: 0 16px 34px rgba(220,38,38,0.08);
+        grid-column: span 1;
+      }
+
+      .video-card--strong {
+        border-color: rgba(37,99,235,0.16);
+        box-shadow: 0 14px 30px rgba(37,99,235,0.07);
+        grid-column: span 1;
+      }
+
+      .video-card--signal .video-card-head h4,
+      .video-card--strong .video-card-head h4 {
+        color: var(--ink);
+      }
+
+      #themeVideos {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      #themeVideos .video-card {
+        padding: 8px 9px 8px;
+      }
+
+      #themeVideos .video-card--priority {
+        grid-column: span 2;
+        padding: 11px 12px 10px;
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.06), transparent 34%),
+          rgba(255,255,255,0.88);
+      }
+
+      #themeVideos .video-card--priority .video-card-head h4 {
+        font-size: 15px;
+      }
+
+      #themeVideos .video-card--priority .video-card-hook strong {
+        font-size: 11px;
+      }
+
+      #themeVideos .video-card:not(.video-card--priority) .video-card-hook strong {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .video-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .video-card-head h4 {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: -0.02em;
+      }
+
+      .video-card-head a {
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .video-card-meta,
+      .video-card-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 7px;
+      }
+
+      .video-card-copy {
+        margin: 0 0 8px;
+        color: var(--ink);
+        font-size: 10px;
+        line-height: 1.32;
+        font-weight: 600;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .video-card-hook {
+        display: grid;
+        gap: 3px;
+        margin: 0 0 7px;
+        padding: 5px 7px;
+        border-radius: 13px;
+        background: rgba(25,23,20,0.04);
+      }
+
+      .video-card-hook span {
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .video-card-hook strong {
+        font-size: 10px;
+        line-height: 1.32;
+        letter-spacing: -0.01em;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .video-card-flag {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 10px;
+        margin-bottom: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      .video-card-flag--signal {
+        background: rgba(220,38,38,0.10);
+        color: var(--hot);
+      }
+
+      .video-card-flag--strong {
+        background: rgba(37,99,235,0.10);
+        color: var(--blue);
+      }
+
+      .stat-pair {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 6px;
+        border-radius: 14px;
+        padding: 5px 7px;
+        background: rgba(25,23,20,0.05);
+      }
+
+      .stat-pair strong {
+        font-size: 16px;
+        letter-spacing: -0.03em;
+      }
+
+      .stat-pair span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .video-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin-top: 2px;
+      }
+
+      .video-card-actions .muted {
+        font-size: 12px;
+      }
+
+      .theme-role-groups {
+        display: grid;
+        gap: 16px;
+        padding: 12px 0 2px;
+      }
+
+      .theme-role-map {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .theme-role-map-card {
+        border-radius: 18px;
+        padding: 12px 12px 10px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.82);
+        box-shadow: 0 10px 22px rgba(25,23,20,0.03);
+      }
+
+      .theme-role-map-card strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+        letter-spacing: -0.02em;
+      }
+
+      .theme-role-map-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .theme-role-map-card em {
+        display: inline-flex;
+        margin-top: 7px;
+        color: var(--ink);
+        font-style: normal;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .theme-role-map-card--signal {
+        border-color: rgba(220,38,38,0.12);
+        background:
+          radial-gradient(circle at top right, rgba(220,38,38,0.06), transparent 36%),
+          rgba(255,251,251,0.9);
+      }
+
+      .theme-role-map-card--delta {
+        border-color: rgba(37,99,235,0.12);
+        background:
+          radial-gradient(circle at top right, rgba(37,99,235,0.06), transparent 36%),
+          rgba(249,252,255,0.9);
+      }
+
+      .theme-role-map-card--engagement {
+        border-color: rgba(124,58,237,0.12);
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.06), transparent 36%),
+          rgba(251,249,255,0.9);
+      }
+
+      .theme-role-group {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border-radius: 24px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.84);
+      }
+
+      .theme-role-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 12px;
+      }
+
+      .theme-role-head strong {
+        display: block;
+        font-size: 14px;
+        letter-spacing: -0.02em;
+      }
+
+      .theme-role-head span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .theme-role-group--signal {
+        border-color: rgba(220,38,38,0.10);
+        background:
+          radial-gradient(circle at top right, rgba(220,38,38,0.06), transparent 34%),
+          rgba(255,251,251,0.9);
+      }
+
+      .theme-role-group--delta {
+        border-color: rgba(37,99,235,0.10);
+        background:
+          radial-gradient(circle at top right, rgba(37,99,235,0.06), transparent 34%),
+          rgba(249,252,255,0.9);
+      }
+
+      .theme-role-group--engagement {
+        border-color: rgba(124,58,237,0.10);
+        background:
+          radial-gradient(circle at top right, rgba(124,58,237,0.06), transparent 34%),
+          rgba(251,249,255,0.9);
+      }
+
+      .theme-role-group--regular {
+        background: rgba(255,255,255,0.8);
+      }
+
+      .theme-role-title {
+        display: grid;
+        gap: 3px;
+      }
+
+      .theme-role-title p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .theme-role-count {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(25,23,20,0.05);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .theme-role-spotlight {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: start;
+        padding: 12px 13px;
+        border-radius: 20px;
+        border: 1px solid rgba(25,23,20,0.06);
+        background: rgba(255,255,255,0.76);
+      }
+
+      .theme-role-spotlight-copy {
+        display: grid;
+        gap: 8px;
+      }
+
+      .theme-role-kicker {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        border-radius: 999px;
+        padding: 3px 8px;
+        background: rgba(25,23,20,0.05);
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .theme-role-spotlight-copy strong {
+        display: block;
+        font-size: 14px;
+        letter-spacing: -0.02em;
+      }
+
+      .theme-role-spotlight-copy p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.42;
+      }
+
+      .theme-role-spotlight-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .theme-role-spotlight-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .theme-role-spotlight-links a {
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .theme-role-spotlight-stats {
+        min-width: 118px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .theme-role-spotlight-stats .stat-pair {
+        justify-content: space-between;
+      }
+
+      .theme-role-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .theme-role-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .theme-role-grid .video-card {
+        min-height: 100%;
+      }
+
+      @media (max-width: 1100px) {
+        .theme-role-map {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (min-width: 1360px) {
+        .video-wall {
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+      }
+
+      .empty-state {
+        padding: 18px 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th, td {
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+        font-size: 14px;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: rgba(251, 248, 243, 0.96);
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      .input {
+        min-width: 210px;
+        border-radius: 999px;
+        border: 1px solid var(--line-strong);
+        padding: 10px 14px;
+        font: inherit;
+        background: rgba(255,255,255,0.7);
+      }
+
+      .muted { color: var(--muted); }
+
+      @media (max-width: 1180px) {
+        .hero,
+        .meta-block,
+        .section-grid,
+        .battle-grid,
+        .big-grid,
+        .featured-shelf {
+          grid-template-columns: 1fr;
+        }
+        .hero-topbar,
+        .hero-brief {
+          grid-template-columns: 1fr;
+        }
+        .hero-status-rail {
+          justify-content: flex-start;
+        }
+        .hero-cues {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+        .hero-actions {
+          justify-content: flex-start;
+        }
+        .theme-spotlight {
+          grid-template-columns: 1fr;
+        }
+        .action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .card, .card--secondary, .card--primary { grid-column: span 1; }
+        .theme-opportunity-grid { grid-template-columns: 1fr; }
+        .competitor-grid { grid-template-columns: 1fr; }
+        .rank-card { grid-template-columns: 54px 1fr; }
+        .rank-side { justify-items: start; min-width: 0; }
+        .highlight-metric { text-align: left; }
+        .video-wall { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 720px) {
+        .shell { padding: 16px 12px 36px; }
+        .cards { grid-template-columns: 1fr; }
+        .card, .card--secondary, .card--primary { grid-column: span 1; }
+        .action-grid { grid-template-columns: 1fr; }
+        .theme-opportunity-grid { grid-template-columns: 1fr; }
+        .competitor-grid { grid-template-columns: 1fr; }
+        .hero-main, .panel { border-radius: 22px; }
+        .hero-main { padding: 14px 12px 14px; }
+        .panel-head { padding: 16px 16px 12px; }
+        .list { padding: 8px 10px 12px; }
+        .detail { padding: 16px; }
+        .selector-head,
+        .selector-shelf { padding-left: 16px; padding-right: 16px; }
+        .result-bar { flex-direction: column; align-items: flex-start; }
+        .result-summary { justify-content: flex-start; }
+        th, td { padding: 10px 8px; }
+        .video-card--signal,
+        .video-card--strong { grid-column: span 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <div class="hero-main">
+          <div class="hero-topbar">
+            <div class="hero-copy">
+              <div class="eyebrow">同行监控盘</div>
+              <h1>同行新爆雷达 · 近3个月主题盘</h1>
+              <div class="headline" id="headline">加载中</div>
+            </div>
+            <div class="hero-status-rail">
+              <div class="summary-pill"><strong>最近采集</strong><span id="latestCollectionAt">加载中</span></div>
+              <div class="summary-pill"><strong>跟踪范围</strong><span><span id="totalAccounts">0</span> 个账号｜<span id="totalVideos">0</span> 条近90天视频</span></div>
+              <div class="summary-pill"><strong>底库入口</strong><a id="baseUrl" href="#" target="_blank" rel="noreferrer">打开飞书 Base</a></div>
+              <div class="signal-strip" id="signalStrip"></div>
+            </div>
+          </div>
+          <div class="hero-brief">
+            <div class="hero-lead">
+              <strong>今天先盯两条主线</strong>
+              <span>先看新爆，再翻主题</span>
+            </div>
+            <div class="hero-cues" id="heroCues"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="battle-grid">
+        <div class="battle-main">
+          <article class="panel" id="must-watch-panel">
+            <div class="panel-head">
+              <div>
+              <div class="panel-kicker">新爆主线</div>
+                <h2 class="panel-title">今天新爆视频 TOP3</h2>
+                <div class="panel-sub">先盯今天起量最快的一条，再扫后两条。</div>
+              </div>
+            </div>
+            <div class="list" id="mustWatch"></div>
+          </article>
+        </div>
+
+        <div class="battle-side">
+          <section class="panel" id="theme-opportunity-panel">
+            <div class="panel-head">
+              <div>
+              <div class="panel-kicker">主题主线</div>
+                <h2 class="panel-title">近3个月主题参考 TOP3</h2>
+                <div class="panel-sub">先翻代表视频，再顺着主题回看近90天高表现素材。</div>
+              </div>
+              <a class="panel-cta" href="#intel-center">打开主题素材池</a>
+            </div>
+            <div class="theme-opportunity-grid" id="themeOpportunities"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel" id="intel-center">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">主题素材池</div>
+            <h2 class="panel-title">先按主题翻素材</h2>
+            <div class="panel-sub">默认先按主题翻近90天高表现素材，账号和总库作为补充入口。</div>
+          </div>
+        </div>
+        <div class="tab-shell">
+          <div class="tab-bar" id="tabBar">
+            <button class="tab-button is-active" data-tab="theme">主题素材池</button>
+            <button class="tab-button" data-tab="account">账号素材池</button>
+            <button class="tab-button" data-tab="library">视频总库</button>
+          </div>
+
+          <div class="tab-panel" id="tab-account">
+            <div class="selector-head">
+              <div>
+                <div class="panel-kicker">同行目录</div>
+                <strong>按账号继续翻</strong>
+                <span id="accountShelfMeta">默认加载中</span>
+              </div>
+            </div>
+            <div class="selector-shelf" id="accountShelf"></div>
+            <div class="detail">
+              <div class="detail-header">
+                <div>
+                  <div class="panel-kicker">账号详情</div>
+                  <h3 id="detailHandle">加载中</h3>
+                </div>
+                <a id="detailProfile" href="#" target="_blank" rel="noreferrer">打开主页</a>
+              </div>
+              <div class="result-bar">
+                <div class="detail-strip" id="detailMeta"></div>
+                <div class="result-summary" id="accountResultSummary"></div>
+              </div>
+              <div class="filters" id="accountFilters"></div>
+              <div class="featured-block">
+                <div class="featured-head">
+                  <strong>这个账号先看 TOP3</strong>
+                  <span id="accountFeaturedSummary">加载中</span>
+                </div>
+                <div class="featured-shelf" id="accountFeatured"></div>
+              </div>
+              <div class="catalog-head">
+                <strong>再翻这个账号的全部素材</strong>
+                <span id="accountCatalogSummary">加载中</span>
+              </div>
+              <div class="detail-scroll">
+                <div class="video-wall" id="accountVideos"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel is-active" id="tab-theme">
+            <div class="selector-head">
+              <div>
+                <div class="panel-kicker">主题目录</div>
+                <strong>先按主题翻</strong>
+                <span id="themeShelfMeta">默认加载中</span>
+              </div>
+            </div>
+            <div class="selector-shelf" id="themeShelf"></div>
+            <div class="detail">
+              <div class="detail-header">
+                <div>
+                  <div class="panel-kicker">主题详情</div>
+                  <h3 id="themeHandle">加载中</h3>
+                </div>
+              </div>
+              <div class="theme-spotlight" id="themeSpotlight"></div>
+              <div class="result-bar">
+                <div class="detail-strip" id="themeMeta"></div>
+                <div class="result-summary" id="themeResultSummary"></div>
+              </div>
+                <div class="filters" id="themeFilters"></div>
+              <div class="theme-flow-strip" id="themeFlowStrip"></div>
+              <div class="featured-block" id="themeFeaturedBlock">
+                <div class="featured-head">
+                  <strong>这个主题先看 TOP3</strong>
+                  <span id="themeFeaturedSummary">加载中</span>
+                </div>
+                <div class="featured-shelf" id="themeFeatured"></div>
+              </div>
+              <div class="catalog-head" id="themeCatalogBlock">
+                <div>
+                  <strong>这个主题的素材池</strong>
+                  <small>先翻重点，再顺着这个主题继续翻近90天高表现素材。</small>
+                </div>
+                <span id="themeCatalogSummary">加载中</span>
+              </div>
+              <div class="detail-scroll">
+                <div class="video-wall" id="themeVideos"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-library">
+            <div class="detail">
+              <div class="detail-header">
+                <div>
+                  <div class="panel-kicker">视频总库</div>
+                  <h3>按条件检索全部素材</h3>
+                </div>
+              </div>
+              <div class="result-bar">
+                <div class="detail-strip" id="libraryMeta"></div>
+                <div class="result-summary" id="libraryResultSummary"></div>
+              </div>
+              <div class="filters">
+                <input class="input" id="librarySearch" type="search" placeholder="搜索账号或主题，例如 people skills" />
+              </div>
+              <div class="filters" id="libraryWindowFilters"></div>
+              <div class="filters" id="librarySortFilters"></div>
+              <div class="featured-block">
+                <div class="featured-head">
+                  <strong>当前筛选先看 TOP3</strong>
+                  <span id="libraryFeaturedSummary">加载中</span>
+                </div>
+                <div class="featured-shelf" id="libraryFeatured"></div>
+              </div>
+              <div class="catalog-head">
+                <strong>再翻当前筛选下的全部素材</strong>
+                <span id="libraryCatalogSummary">加载中</span>
+              </div>
+              <div class="detail-scroll" style="max-height: 680px;">
+                <div class="video-wall" id="libraryRows"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-grid">
+        <article class="panel panel--support" id="recent-strong-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">补充素材</div>
+              <h2 class="panel-title">近7天可直接抄 TOP3</h2>
+              <div class="panel-sub">主题翻完后，再补这3条近期可直接抄的素材。</div>
+            </div>
+          </div>
+          <div class="list" id="recentStrong"></div>
+        </article>
+
+        <div class="battle-side">
+          <section class="panel panel--support" id="competitor-panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-kicker">跟踪账号</div>
+                <h2 class="panel-title">今天要盯的账号 TOP3</h2>
+                <div class="panel-sub">最后再回到账号维度，决定今天继续盯谁。</div>
+              </div>
+            </div>
+            <div class="competitor-grid" id="topCompetitors"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const state = {
+        data: null,
+        activeHandle: "",
+        activeTheme: "",
+        accountWindowDays: 30,
+        themeWindowDays: 90,
+        libraryWindowDays: 30,
+        librarySort: "latest",
+        librarySearch: ""
+      };
+
+      init().catch((error) => {
+        document.body.innerHTML = `<pre style="padding:24px;color:#b91c1c;">${String(error?.stack || error)}</pre>`;
+      });
+
+      async function init() {
+        const response = await fetch("/api/monitor-dashboard");
+        if (!response.ok) throw new Error(`dashboard fetch failed: ${response.status}`);
+        state.data = await response.json();
+        render();
+      }
+
+      function render() {
+        renderMeta();
+        renderMustWatch();
+        renderRecentStrong();
+        renderThemeOpportunities();
+        renderTopCompetitors();
+        renderThemeRail();
+        renderAccounts();
+        renderLibraryControls();
+        renderLibraryRows();
+      }
+
+      function renderMeta() {
+        const { latestCollectionAt, baseUrl, signalBreakdown, headline, stats, actionPlan = [] } = state.data;
+        document.getElementById("latestCollectionAt").textContent = formatDate(latestCollectionAt);
+        document.getElementById("totalAccounts").textContent = formatNumber(stats?.totalAccounts || 0);
+        document.getElementById("totalVideos").textContent = formatNumber(stats?.totalVideos || 0);
+        document.getElementById("baseUrl").href = baseUrl || "#";
+        document.getElementById("headline").textContent = headline || "先抓今天起量的视频，再翻近3个月最该回看的主题。";
+        document.getElementById("heroCues").innerHTML = actionPlan.slice(0, 2).map((item) => `
+          <div class="hero-cue">
+            <strong>${escapeHtml(item.stepLabel || "先看")}</strong>
+            <span>${escapeHtml(item.title || "先翻这条")}</span>
+            <small>${escapeHtml(compactCue(item))}</small>
+            ${item.href ? `<a href="${item.href}" target="_blank" rel="noreferrer">去看</a>` : `<span></span>`}
+          </div>
+        `).join("");
+        document.getElementById("signalStrip").innerHTML = [
+          { label: "3天内新爆", value: signalBreakdown.newBreakout },
+          { label: "4-7天持续涨", value: signalBreakdown.sustainedGrowth },
+          { label: "8-15天长尾爆", value: signalBreakdown.longTail }
+        ].map((item) => `
+          <div class="signal-pill"><span>${escapeHtml(item.label)}</span><strong>${formatNumber(item.value)}</strong></div>
+        `).join("");
+      }
+
+      function renderMustWatch() {
+        const items = state.data.mustWatch.slice(0, 3);
+        if (!items.length) {
+          document.getElementById("mustWatch").innerHTML = `<div class="empty-state">今天还没有新的爆点预警。</div>`;
+          return;
+        }
+        const [hero, ...rest] = items;
+        document.getElementById("mustWatch").innerHTML = `
+          <div class="leaderboard">
+            <article class="leaderboard-hero">
+              <div class="rank-badge">${hero.rank}</div>
+              <div class="leaderboard-main">
+                <div class="leaderboard-role">头号爆点</div>
+                <h3>${escapeHtml(hero.accountHandle)}</h3>
+                <div class="tags">
+                  <span class="tag">${escapeHtml(hero.label)}</span>
+                  <span class="tag">${escapeHtml(hero.theme)}</span>
+                  <span class="tag">发布 ${escapeHtml(shortDate(hero.publishedAt))}</span>
+                  ${hero.viewMultiple > 0 ? `<span class="tag">高于常规 ${hero.viewMultiple.toFixed(2)}x</span>` : ""}
+                </div>
+                <div class="leaderboard-battle-strip">
+                  <span class="battle-pill"><span>当前播放</span>${formatNumber(hero.views)}</span>
+                  <span class="battle-pill"><span>当前点赞</span>${formatNumber(hero.likes)}</span>
+                  <span class="battle-pill"><span>当前分享</span>${formatNumber(hero.shares)}</span>
+                </div>
+                <p class="leaderboard-hookline">先拆这条今天最先起量的开场钩子，再顺着 ${escapeHtml(hero.theme)} 去翻同类素材。</p>
+                <div class="leaderboard-directive">
+                  <strong>先做</strong>
+                  <span>${escapeHtml(compactAction(hero.action, "先确认这条今天还在继续涨。"))}</span>
+                </div>
+                <div class="leaderboard-links">
+                  <a href="${hero.entityUrl}" target="_blank" rel="noreferrer">查看视频</a>
+                  <a href="#intel-center" data-nav="theme" data-theme="${escapeHtml(hero.theme)}">顺着主题翻素材池</a>
+                </div>
+              </div>
+              <div class="rank-side">
+                <div class="highlight-metric">
+                  <strong>+${formatNumber(hero.deltaViews)}</strong>
+                  <span>24h 播放增量</span>
+                </div>
+                <div class="highlight-metric">
+                  <strong>${formatNumber(hero.shares)}</strong>
+                  <span>当前分享</span>
+                </div>
+              </div>
+            </article>
+            <div class="leaderboard-followups">
+              ${rest.map((item) => `
+                <article class="leaderboard-row">
+                  <div class="rank-badge">${item.rank}</div>
+                  <div>
+                    <strong>${escapeHtml(item.accountHandle)}</strong>
+                    <div class="row-meta">
+                      <span class="row-chip">${escapeHtml(item.label)}</span>
+                      <span class="row-chip">${escapeHtml(item.theme)}</span>
+                      <span class="row-chip">发布 ${escapeHtml(shortDate(item.publishedAt))}</span>
+                    </div>
+                    <div class="row-links">
+                      <a href="${item.entityUrl}" target="_blank" rel="noreferrer">查看视频</a>
+                      <a href="#intel-center" data-nav="theme" data-theme="${escapeHtml(item.theme)}">继续翻这个主题</a>
+                    </div>
+                  </div>
+                  <div class="mini-metric">
+                    <strong>+${formatNumber(item.deltaViews)}</strong>
+                    <span>24h增量</span>
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderRecentStrong() {
+        const items = state.data.recentStrong.slice(0, 3);
+        if (!items.length) {
+          document.getElementById("recentStrong").innerHTML = `<div class="empty-state">今天还没有新的近7天好素材。</div>`;
+          return;
+        }
+        const [hero, ...rest] = items;
+        document.getElementById("recentStrong").innerHTML = `
+          <div class="compact-board">
+            <article class="compact-hero">
+              <div class="rank-badge">${hero.rank}</div>
+              <div>
+                <h3>${escapeHtml(hero.accountHandle)}</h3>
+                <div class="tags">
+                  <span class="tag">${escapeHtml(hero.theme)}</span>
+                  <span class="tag">发布 ${escapeHtml(shortDate(hero.publishedAt))}</span>
+                  <span class="tag">分享率 ${(hero.shareRate * 100).toFixed(2)}%</span>
+                </div>
+                <div class="metrics">
+                  <span class="metric">播放 ${formatNumber(hero.views)}</span>
+                  <span class="metric">点赞 ${formatNumber(hero.likes)}</span>
+                  <span class="metric">分享 ${formatNumber(hero.shares)}</span>
+                </div>
+                <div class="leaderboard-directive">
+                  <strong>先做</strong>
+                  <span>${escapeHtml(compactAction(hero.action, "先拆开场、标题和转发点。"))}</span>
+                </div>
+                <div class="leaderboard-links">
+                  <a href="${hero.entityUrl}" target="_blank" rel="noreferrer">查看视频</a>
+                  <a href="#intel-center" data-nav="theme" data-theme="${escapeHtml(hero.theme)}">顺着主题继续翻</a>
+                </div>
+              </div>
+              <div class="compact-side">
+                <div class="highlight-metric">
+                  <strong>${formatNumber(hero.likes)}</strong>
+                  <span>当前点赞</span>
+                </div>
+                <div class="highlight-metric">
+                  <strong>${(hero.shareRate * 100).toFixed(2)}%</strong>
+                  <span>分享率</span>
+                </div>
+              </div>
+            </article>
+            <div class="compact-followups">
+              ${rest.map((item) => `
+                <article class="compact-row">
+                  <div class="rank-badge">${item.rank}</div>
+                  <div>
+                    <strong>${escapeHtml(item.accountHandle)}</strong>
+                    <div class="row-meta">
+                      <span class="row-chip">${escapeHtml(item.theme)}</span>
+                      <span class="row-chip">发布 ${escapeHtml(shortDate(item.publishedAt))}</span>
+                      <span class="row-chip">分享率 ${(item.shareRate * 100).toFixed(2)}%</span>
+                    </div>
+                    <div class="row-links">
+                      <a href="#intel-center" data-nav="theme" data-theme="${escapeHtml(item.theme)}">去主题素材池</a>
+                    </div>
+                  </div>
+                  <div class="mini-metric">
+                    <strong>${formatNumber(item.likes)}</strong>
+                    <span>当前点赞</span>
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderThemeOpportunities() {
+        const items = state.data.themeRank.slice(0, 3);
+        if (!items.length) {
+          document.getElementById("themeOpportunities").innerHTML = `<div class="empty-state">当前没有新的主题机会。</div>`;
+          return;
+        }
+        const [hero, ...rest] = items;
+        document.getElementById("themeOpportunities").innerHTML = `
+          <div class="leaderboard">
+            <article class="leaderboard-hero">
+              <div class="rank-badge">${hero.rank}</div>
+              <div class="leaderboard-main">
+                <div class="leaderboard-role leaderboard-role--violet">${escapeHtml(hero.roleLabel || "主题先翻")}</div>
+                <h3>${escapeHtml(hero.theme)}</h3>
+                <div class="tags">
+                  <span class="tag">主题主线</span>
+                  <span class="tag">代表账号 ${escapeHtml(hero.representativeAccount || "待补")}</span>
+                  ${hero.representativePublishedAt ? `<span class="tag">代表视频 ${escapeHtml(shortDate(hero.representativePublishedAt))}</span>` : ""}
+                </div>
+                <div class="leaderboard-battle-strip">
+                  <span class="battle-pill"><span>近7天上新</span>${formatNumber(hero.recent7dCount)}</span>
+                  <span class="battle-pill"><span>高表现</span>${formatNumber(hero.qualifiedCount)}</span>
+                  <span class="battle-pill"><span>最高播放</span>${formatNumber(hero.topViews)}</span>
+                </div>
+                <p class="leaderboard-hookline">${escapeHtml(hero.roleHint || "先看代表视频，再顺着这个主题往下翻。")}</p>
+                <div class="leaderboard-directive">
+                  <strong>先做</strong>
+                  <span>${escapeHtml(hero.roleHint || compactAction(hero.reason, "先看代表视频，再顺着这个主题往下翻。"))}</span>
+                </div>
+                <div class="leaderboard-links">
+                  <a href="${hero.representativeVideoUrl}" target="_blank" rel="noreferrer">先看代表视频</a>
+                  <a href="#intel-center" data-nav="theme" data-theme="${escapeHtml(hero.theme)}">打开主题素材池</a>
+                  ${hero.representativeAccount ? `<a href="#intel-center" data-nav="account" data-handle="${escapeHtml(hero.representativeAccount)}">打开代表账号池</a>` : ""}
+                </div>
+              </div>
+              <div class="rank-side">
+                <div class="highlight-metric">
+                  <strong>${formatNumber(hero.qualifiedCount)}</strong>
+                  <span>高表现视频</span>
+                </div>
+                <div class="highlight-metric">
+                  <strong>${formatNumber(hero.topViews)}</strong>
+                  <span>最高播放</span>
+                </div>
+              </div>
+            </article>
+            <div class="leaderboard-followups">
+              ${rest.map((theme) => `
+                <article class="leaderboard-row">
+                  <div class="rank-badge">${theme.rank}</div>
+                  <div>
+                    <strong>${escapeHtml(theme.theme)}</strong>
+                    <div class="row-meta">
+                      <span class="row-chip">${escapeHtml(theme.roleLabel || "主题参考")}</span>
+                      <span class="row-chip">近7天上新 ${formatNumber(theme.recent7dCount)}</span>
+                      <span class="row-chip">高表现 ${formatNumber(theme.qualifiedCount)}</span>
+                    </div>
+                    <div class="row-links">
+                      ${theme.representativeVideoUrl ? `<a href="${theme.representativeVideoUrl}" target="_blank" rel="noreferrer">先看代表视频</a>` : ""}
+                      <a href="#intel-center" data-nav="theme" data-theme="${escapeHtml(theme.theme)}">打开主题素材池</a>
+                    </div>
+                  </div>
+                  <div class="mini-metric">
+                    <strong>${formatNumber(theme.topViews)}</strong>
+                    <span>最高播放</span>
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderTopCompetitors() {
+        const items = state.data.topCompetitors.slice(0, 3);
+        if (!items.length) {
+          document.getElementById("topCompetitors").innerHTML = `<div class="empty-state">当前没有新的重点同行。</div>`;
+          return;
+        }
+        const [hero, ...rest] = items;
+        document.getElementById("topCompetitors").innerHTML = `
+          <div class="compact-board">
+            <article class="compact-hero">
+              <div class="rank-badge">${hero.rank || 1}</div>
+              <div>
+                <h3>${escapeHtml(hero.handle)}</h3>
+                <div class="tags">
+                  <span class="tag">${escapeHtml(hero.theme || "待补主题")}</span>
+                  <span class="tag">${escapeHtml(hero.recentLabel || hero.watchLevel || "持续观察")}</span>
+                </div>
+                <div class="metrics">
+                  <span class="metric">近7天发文 ${formatNumber(hero.posts7d)}</span>
+                  <span class="metric">近7天好素材 ${formatNumber(hero.strongCount7d)}</span>
+                  <span class="metric">近15天最高播放 ${formatNumber(hero.topViews15d)}</span>
+                </div>
+                <div class="leaderboard-directive">
+                  <strong>先做</strong>
+                  <span>${escapeHtml(compactAction(hero.action, "先从最近代表视频切，再决定今天要不要继续盯。"))}</span>
+                </div>
+                <div class="leaderboard-links">
+                  <a href="${hero.latestVideoUrl || hero.profileUrl || '#'}" target="_blank" rel="noreferrer">先看最近代表视频</a>
+                  <a href="#intel-center" data-nav="account" data-handle="${escapeHtml(hero.handle)}">打开账号素材池</a>
+                  ${hero.profileUrl ? ` · <a href="${hero.profileUrl}" target="_blank" rel="noreferrer">打开主页</a>` : ""}
+                </div>
+              </div>
+              <div class="compact-side">
+                <div class="highlight-metric">
+                  <strong>${formatNumber(hero.strongCount7d)}</strong>
+                  <span>近7天好素材</span>
+                </div>
+                <div class="highlight-metric">
+                  <strong>${formatNumber(hero.topViews15d)}</strong>
+                  <span>近15天最高播放</span>
+                </div>
+              </div>
+            </article>
+            <div class="compact-followups">
+              ${rest.map((account, index) => `
+                <article class="compact-row">
+                  <div class="rank-badge">${account.rank || index + 2}</div>
+                  <div>
+                    <strong>${escapeHtml(account.handle)}</strong>
+                    <div class="row-meta">
+                      <span class="row-chip">${escapeHtml(account.theme || "待补主题")}</span>
+                      <span class="row-chip">近7天好素材 ${formatNumber(account.strongCount7d)}</span>
+                      <span class="row-chip">近15天最高播放 ${formatNumber(account.topViews15d)}</span>
+                    </div>
+                    <div class="row-links">
+                      <a href="#intel-center" data-nav="account" data-handle="${escapeHtml(account.handle)}">打开账号素材池</a>
+                    </div>
+                  </div>
+                  <div class="mini-metric">
+                    <strong>${formatNumber(account.strongCount7d)}</strong>
+                    <span>好素材</span>
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderAccounts() {
+        const accounts = state.data.accountRank;
+        state.activeHandle = state.activeHandle || accounts[0]?.handle || "";
+        document.getElementById("accountShelfMeta").textContent =
+          `当前重点账号 ${formatNumber(accounts.length)} 个｜先点账号，再看最近一批能不能继续抄。`;
+        document.getElementById("accountShelf").innerHTML = accounts.slice(0, 8).map((account) => `
+          <button class="selector-card ${account.handle === state.activeHandle ? "is-active" : ""}" data-handle="${escapeHtml(account.handle)}">
+            <strong>#${account.rank} ${escapeHtml(account.handle)}</strong>
+            <span>${escapeHtml(account.theme)} · ${escapeHtml(account.recentLabel || account.watchLevel || "持续观察")}</span>
+            <span>近7天好素材 ${formatNumber(account.strongCount7d)}｜近15天最高播放 ${formatNumber(account.topViews15d)}</span>
+          </button>
+        `).join("");
+
+        document.querySelectorAll("#accountShelf .selector-card").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.activeHandle = button.dataset.handle || "";
+            renderAccounts();
+          });
+        });
+
+        renderAccountFilters();
+        renderAccountDetail();
+      }
+
+      function renderAccountFilters() {
+        document.getElementById("accountFilters").innerHTML = renderChipRow(
+          [
+            { label: "近7天", value: 7 },
+            { label: "近30天", value: 30 },
+            { label: "近90天", value: 90 }
+          ],
+          state.accountWindowDays,
+          (value) => {
+            state.accountWindowDays = value;
+            renderAccountFilters();
+            renderAccountDetail();
+          }
+        );
+      }
+
+      function renderAccountDetail() {
+        const account = state.data.accounts.find((item) => item.handle === state.activeHandle) || state.data.accounts[0];
+        if (!account) return;
+        document.getElementById("detailHandle").textContent = account.handle;
+        document.getElementById("detailMeta").innerHTML = [
+          `<span class="detail-chip">${escapeHtml(account.theme)}</span>`,
+          `<span class="detail-chip">近7天发文 ${formatNumber(account.posts7d)} 条</span>`,
+          `<span class="detail-chip">近7天好素材 ${formatNumber(account.strongCount7d)} 条</span>`,
+          `<span class="detail-chip">近15天最高播放 ${formatNumber(account.topViews15d)}</span>`
+        ].join("");
+        document.getElementById("detailProfile").href = account.profileUrl || "#";
+
+        const filtered = state.data.videos
+          .filter((item) => item.accountHandle === account.handle)
+          .filter((item) => withinDays(item.publishedAt, state.accountWindowDays));
+        const featuredCount = filtered.filter((item) => isFeaturedVideo(item)).length;
+        document.getElementById("accountResultSummary").innerHTML = [
+          `<span class="result-pill">当前时间窗 ${formatNumber(filtered.length)} 条</span>`,
+          `<span class="result-pill">重点素材 ${formatNumber(featuredCount)} 条</span>`,
+          `<span class="result-pill">窗口 近${formatNumber(state.accountWindowDays)}天</span>`
+        ].join("");
+        renderFeaturedSection({
+          targetSummaryId: "accountFeaturedSummary",
+          targetFeaturedId: "accountFeatured",
+          targetWallId: "accountVideos",
+          targetCatalogSummaryId: "accountCatalogSummary",
+          videos: filtered,
+          summaryLabel: "这个账号最近最值得继续翻的素材",
+          renderOptions: { showAction: true },
+          emptyText: "当前时间窗内暂无视频。"
+        });
+      }
+
+      function renderThemeRail() {
+        const themes = state.data.themeRank;
+        state.activeTheme = state.activeTheme || themes[0]?.theme || "";
+        document.getElementById("themeShelfMeta").textContent =
+          `当前可参考主题 ${formatNumber(themes.length)} 个｜先点专题目录，再顺着代表视频往下翻近7/30/90天素材。`;
+        document.getElementById("themeShelf").innerHTML = themes.slice(0, 8).map((theme) => `
+          <button class="selector-card ${theme.theme === state.activeTheme ? "is-active" : ""}" data-theme="${escapeHtml(theme.theme)}">
+            <div class="selector-stage">先翻角色｜${escapeHtml(theme.roleLabel || "主题参考")}</div>
+            <strong>#${theme.rank} ${escapeHtml(theme.theme)}</strong>
+            <span>先从 ${escapeHtml(theme.representativeAccount || "代表账号")} 的代表视频切，再顺着这个主题往下翻。</span>
+            <div class="selector-chip-row">
+              <span class="selector-chip">近7天上新 ${formatNumber(theme.recent7dCount)}</span>
+              <span class="selector-chip">高表现 ${formatNumber(theme.qualifiedCount)}</span>
+              <span class="selector-chip">最高播放 ${formatNumber(theme.topViews)}</span>
+            </div>
+            <small>代表账号 ${escapeHtml(theme.representativeAccount || "待补代表账号")}｜代表视频 ${escapeHtml(shortDate(theme.representativePublishedAt || theme.latestPublishedAt))}</small>
+            <span class="selector-note">${escapeHtml(theme.roleHint || "先从代表视频切，再顺着这个主题翻近90天高表现素材。")}</span>
+          </button>
+        `).join("");
+
+        document.querySelectorAll("#themeShelf .selector-card").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.activeTheme = button.dataset.theme || "";
+            renderThemeRail();
+          });
+        });
+
+        renderThemeFilters();
+        renderThemeDetail();
+      }
+
+      function renderThemeFilters() {
+        document.getElementById("themeFilters").innerHTML = renderChipRow(
+          [
+            { label: "近7天", value: 7 },
+            { label: "近30天", value: 30 },
+            { label: "近90天", value: 90 }
+          ],
+          state.themeWindowDays,
+          (value) => {
+            state.themeWindowDays = value;
+            renderThemeFilters();
+            renderThemeDetail();
+          }
+        );
+      }
+
+      function renderThemeDetail() {
+        const theme = state.data.themeRank.find((item) => item.theme === state.activeTheme) || state.data.themeRank[0];
+        if (!theme) return;
+        document.getElementById("themeHandle").textContent = theme.theme;
+        document.getElementById("themeSpotlight").innerHTML = `
+          <div class="theme-spotlight-copy">
+            <div>
+              <span class="theme-spotlight-kicker">主题代表位</span>
+              <strong>这个主题先从代表视频切</strong>
+              <p>先看代表视频，再顺着这个主题回看近90天跑出来的开场、标题和转发点。</p>
+            </div>
+            <div class="theme-spotlight-dossier">
+              <span class="theme-dossier-pill"><strong>代表账号</strong>${escapeHtml(theme.representativeAccount || "待补账号")}</span>
+              <span class="theme-dossier-pill"><strong>代表发布时间</strong>${escapeHtml(shortDate(theme.representativePublishedAt || theme.latestPublishedAt))}</span>
+              <span class="theme-dossier-pill"><strong>近3个月收录</strong>${formatNumber(theme.videoCount)}</span>
+            </div>
+            <div class="theme-spotlight-directive">
+              <strong>先做</strong>
+              <span>${escapeHtml(compactAction(theme.reason || theme.action, "先看代表视频的开场和主题打法，再顺着这个主题往下翻。"))}</span>
+            </div>
+            <div class="theme-spotlight-note">
+              <p>看完代表位后，先拆这条为什么能代表这个主题，再去看下面 TOP3 和这个主题的连续素材池。</p>
+            </div>
+            <div class="theme-spotlight-links">
+              ${theme.representativeVideoUrl ? `<a href="${theme.representativeVideoUrl}" target="_blank" rel="noreferrer">先看代表视频</a>` : ""}
+              ${theme.representativeAccount ? `<a href="#intel-center" data-nav="account" data-handle="${escapeHtml(theme.representativeAccount)}">打开代表账号素材池</a>` : ""}
+              ${theme.representativeAccountUrl ? `<a href="${theme.representativeAccountUrl}" target="_blank" rel="noreferrer">打开代表账号</a>` : ""}
+            </div>
+          </div>
+          <div class="theme-spotlight-metrics">
+            <div class="theme-spotlight-metric">
+              <strong>${formatNumber(theme.qualifiedCount)}</strong>
+              <span>高表现视频</span>
+            </div>
+            <div class="theme-spotlight-metric">
+              <strong>${formatNumber(theme.recent7dCount)}</strong>
+              <span>近7天上新</span>
+            </div>
+            <div class="theme-spotlight-metric">
+              <strong>${formatNumber(theme.videoCount)}</strong>
+              <span>近3个月收录</span>
+            </div>
+          </div>
+        `;
+        document.getElementById("themeMeta").innerHTML = [
+          `<span class="detail-chip">近7天上新 ${formatNumber(theme.recent7dCount)}</span>`,
+          `<span class="detail-chip">高表现 ${formatNumber(theme.qualifiedCount)}</span>`,
+          `<span class="detail-chip">最高播放 ${formatNumber(theme.topViews)}</span>`,
+          theme.representativePublishedAt ? `<span class="detail-chip">代表视频 ${escapeHtml(shortDate(theme.representativePublishedAt))}</span>` : ""
+        ].filter(Boolean).join("");
+        document.getElementById("themeFlowStrip").innerHTML = `
+          <div class="theme-flow-card theme-flow-card--lead">
+            <strong>第一步｜先拆代表位</strong>
+            <span>先看这条代表视频，确认这个主题最近最有效的开场、钩子和转发点。</span>
+            ${theme.representativeVideoUrl ? `<a href="${theme.representativeVideoUrl}" target="_blank" rel="noreferrer">先看代表视频</a>` : `<span>等待补代表视频</span>`}
+          </div>
+          <div class="theme-flow-card">
+            <strong>第二步｜再看 TOP3</strong>
+            <span>再翻这个主题下当前时间窗里最该先拆的三条重点内容。</span>
+            <a href="#themeFeaturedBlock" data-scroll-target="themeFeaturedBlock">跳到这个主题 TOP3</a>
+          </div>
+          <div class="theme-flow-card">
+            <strong>第三步｜最后翻素材池</strong>
+            <span>看完重点内容后，再顺着这个主题翻近90天高表现素材。</span>
+            <a href="#themeCatalogBlock" data-scroll-target="themeCatalogBlock">跳到这个主题的素材池</a>
+          </div>
+        `;
+
+        const filtered = state.data.videos
+          .filter((item) => item.theme === theme.theme)
+          .filter((item) => withinDays(item.publishedAt, state.themeWindowDays));
+        const featuredCount = filtered.filter((item) => isFeaturedVideo(item)).length;
+        document.getElementById("themeResultSummary").innerHTML = [
+          `<span class="result-pill">当前时间窗 ${formatNumber(filtered.length)} 条</span>`,
+          `<span class="result-pill">重点素材 ${formatNumber(featuredCount)} 条</span>`,
+          `<span class="result-pill">窗口 近${formatNumber(state.themeWindowDays)}天</span>`
+        ].join("");
+        renderFeaturedSection({
+          targetSummaryId: "themeFeaturedSummary",
+          targetFeaturedId: "themeFeatured",
+          targetWallId: "themeVideos",
+          targetCatalogSummaryId: "themeCatalogSummary",
+          videos: filtered,
+          summaryLabel: "这个主题先拆爆点｜再看起量｜最后补可抄参考",
+          featuredMode: "theme",
+          wallMode: "theme",
+          renderOptions: { showAccount: true, showAction: true },
+          emptyText: "当前主题在这个时间窗内暂无视频。"
+        });
+      }
+
+      function renderLibraryControls() {
+        document.getElementById("libraryWindowFilters").innerHTML = renderChipRow(
+          [
+            { label: "近3天", value: 3 },
+            { label: "近7天", value: 7 },
+            { label: "近30天", value: 30 },
+            { label: "近90天", value: 90 }
+          ],
+          state.libraryWindowDays,
+          (value) => {
+            state.libraryWindowDays = value;
+            renderLibraryControls();
+            renderLibraryRows();
+          }
+        );
+        document.getElementById("librarySortFilters").innerHTML = renderChipRow(
+          [
+            { label: "最新发布", value: "latest" },
+            { label: "24h增量", value: "delta" },
+            { label: "播放最高", value: "views" }
+          ],
+          state.librarySort,
+          (value) => {
+            state.librarySort = value;
+            renderLibraryControls();
+            renderLibraryRows();
+          }
+        );
+        document.getElementById("librarySearch").value = state.librarySearch;
+        document.getElementById("librarySearch").oninput = (event) => {
+          state.librarySearch = event.target.value.trim().toLowerCase();
+          renderLibraryRows();
+        };
+      }
+
+      function renderLibraryRows() {
+        const keyword = state.librarySearch;
+        const filtered = state.data.videos
+          .filter((item) => withinDays(item.publishedAt, state.libraryWindowDays))
+          .filter((item) => {
+            if (!keyword) return true;
+            return [item.accountHandle, item.theme, item.title].join(" ").toLowerCase().includes(keyword);
+          })
+          .sort((left, right) => compareLibraryRows(left, right, state.librarySort));
+        const featuredCount = filtered.filter((item) => isFeaturedVideo(item)).length;
+        document.getElementById("libraryMeta").innerHTML = [
+          `<span class="detail-chip">窗口 近${formatNumber(state.libraryWindowDays)}天</span>`,
+          `<span class="detail-chip">排序 ${escapeHtml(getLibrarySortLabel(state.librarySort))}</span>`,
+          keyword ? `<span class="detail-chip">关键词 ${escapeHtml(state.librarySearch)}</span>` : `<span class="detail-chip">关键词 全部</span>`
+        ].join("");
+        document.getElementById("libraryResultSummary").innerHTML = [
+          `<span class="result-pill">匹配结果 ${formatNumber(filtered.length)} 条</span>`,
+          `<span class="result-pill">重点素材 ${formatNumber(featuredCount)} 条</span>`
+        ].join("");
+        renderFeaturedSection({
+          targetSummaryId: "libraryFeaturedSummary",
+          targetFeaturedId: "libraryFeatured",
+          targetWallId: "libraryRows",
+          targetCatalogSummaryId: "libraryCatalogSummary",
+          videos: filtered,
+          summaryLabel: "当前筛选下最值得先看的素材",
+          renderOptions: { showAccount: true, showAction: true },
+          emptyText: "当前筛选条件下没有匹配视频。"
+        });
+      }
+
+      function renderFeaturedSection({
+        targetSummaryId,
+        targetFeaturedId,
+        targetWallId,
+        targetCatalogSummaryId,
+        videos,
+        summaryLabel,
+        featuredMode = "default",
+        wallMode = "default",
+        renderOptions,
+        emptyText
+      }) {
+        const ranked = [...videos].sort(compareFeaturedRows);
+        const featured = selectFeaturedRows(ranked, featuredMode);
+        const featuredKeys = new Set(featured.map((item) => item.url || item.key));
+        const rest = ranked.filter((item) => !featuredKeys.has(item.url || item.key));
+        document.getElementById(targetSummaryId).textContent = featured.length
+          ? `${summaryLabel}｜先看 ${featured.map((item) => getFeaturedBucketLabel(item, featuredMode)).join(" / ")}`
+          : "当前筛选下没有可优先看的素材";
+        document.getElementById(targetFeaturedId).innerHTML = featured.length
+          ? renderFeaturedShelf(featured, renderOptions, featuredMode)
+          : `<div class="empty-state">当前筛选下没有可优先看的素材。</div>`;
+        document.getElementById(targetCatalogSummaryId).textContent = rest.length
+          ? (wallMode === "theme"
+              ? `按角色继续翻｜剩余 ${formatNumber(rest.length)} 条`
+              : `剩余 ${formatNumber(rest.length)} 条可继续翻`)
+          : "已经没有剩余素材";
+        const rows = rest
+          .slice(0, 60);
+        document.getElementById(targetWallId).innerHTML = rows.length
+          ? (wallMode === "theme"
+              ? renderThemeRoleCatalog(rows, renderOptions, featuredMode)
+              : rows.map((video, index) => renderVideoWallCard(video, { ...renderOptions, showAction: false, wallMode, wallIndex: index, featuredMode })).join(""))
+          : `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+      }
+
+      function renderFeaturedShelf(videos, renderOptions, featuredMode = "default") {
+        const [hero, ...rest] = videos;
+        return `
+          <div class="featured-shelf">
+            ${renderFeaturedHeroCard(hero, 0, renderOptions, featuredMode)}
+            <div class="featured-followups">
+              ${rest.map((video, index) => renderFeaturedMiniCard(video, index + 1, featuredMode)).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderVideoWallCard(video, { showAccount = false, showAction = false, wallMode = "default", wallIndex = 0, featuredMode = "default" } = {}) {
+        const performanceClass = getVideoCardClass(video);
+        const performanceFlag = getVideoCardFlag(video);
+        const featured = isFeaturedVideo(video);
+        const hookText = compactAction(video.action, defaultActionForVideo(video));
+        const wallClasses = [];
+        if (wallMode === "theme" && wallIndex < 2) {
+          wallClasses.push("video-card--priority");
+        }
+        const meta = [
+          `<span class="tag">发布 ${escapeHtml(shortDate(video.publishedAt))}</span>`,
+          `<span class="tag">${escapeHtml(video.theme)}</span>`,
+          video.label ? `<span class="tag">${escapeHtml(video.label)}</span>` : ""
+        ];
+        if (showAccount) {
+          meta.unshift(`<span class="tag">账号 ${escapeHtml(video.accountHandle)}</span>`);
+        }
+        const actionMeta = [
+          showAccount ? `<span class="muted">账号：${escapeHtml(video.accountHandle)}</span>` : "",
+          video.comments >= 100 ? `<span class="muted">评论 ${formatNumber(video.comments)}</span>` : ""
+        ].filter(Boolean);
+        return `
+          <article class="video-card ${[performanceClass, ...wallClasses].filter(Boolean).join(" ")}">
+            ${performanceFlag ? `<div class="video-card-flag ${performanceFlag.className}">${escapeHtml(performanceFlag.label)}</div>` : ""}
+            <div class="video-card-head">
+              <div>
+                <h4>${escapeHtml(video.title)}</h4>
+                <div class="video-card-meta">${meta.filter(Boolean).join("")}</div>
+              </div>
+              <a href="${video.url}" target="_blank" rel="noreferrer">查看视频</a>
+            </div>
+            <div class="video-card-stats">
+              <div class="stat-pair"><strong>${formatNumber(video.views)}</strong><span>播放</span></div>
+              <div class="stat-pair"><strong>${formatNumber(video.likes)}</strong><span>点赞</span></div>
+              <div class="stat-pair"><strong>${formatNumber(video.shares)}</strong><span>分享</span></div>
+              <div class="stat-pair"><strong>+${formatNumber(video.deltaViews24h)}</strong><span>24h增量</span></div>
+            </div>
+            ${showAction && featured
+              ? `<p class="video-card-copy">先看：${escapeHtml(hookText)}</p>`
+              : `<div class="video-card-hook"><span>${escapeHtml(getFeaturedBucketLabel(video, featuredMode))}</span><strong>${escapeHtml(hookText)}</strong></div>`}
+            ${actionMeta.length ? `<div class="video-card-actions">${actionMeta.join("")}</div>` : ""}
+          </article>
+        `;
+      }
+
+      function renderFeaturedCard(video, index, { showAccount = false, showAction = false } = {}, featuredMode = "default") {
+        const performanceClass = getVideoCardClass(video).replace("video-card", "feature-card");
+        const performanceFlag = getVideoCardFlag(video);
+        const meta = [
+          `<span class="tag">发布 ${escapeHtml(shortDate(video.publishedAt))}</span>`,
+          `<span class="tag">${escapeHtml(video.theme)}</span>`,
+          video.label ? `<span class="tag">${escapeHtml(video.label)}</span>` : ""
+        ];
+        if (showAccount) {
+          meta.unshift(`<span class="tag">账号 ${escapeHtml(video.accountHandle)}</span>`);
+        }
+        return `
+          <article class="feature-card ${performanceClass}">
+            ${performanceFlag ? `<div class="video-card-flag ${performanceFlag.className}">${escapeHtml(performanceFlag.label)}</div>` : ""}
+            <div class="feature-card-head">
+              <div class="feature-card-rank">${index + 1}</div>
+              <a href="${video.url}" target="_blank" rel="noreferrer">查看视频</a>
+            </div>
+            ${featuredMode === "theme" ? `<div class="feature-role">${escapeHtml(getFeaturedBucketLabel(video, featuredMode))}</div>` : ""}
+            <h4>${escapeHtml(video.title)}</h4>
+            <div class="video-card-meta">${meta.filter(Boolean).join("")}</div>
+            <div class="video-card-stats">
+              <div class="stat-pair"><strong>${formatNumber(video.views)}</strong><span>播放</span></div>
+              <div class="stat-pair"><strong>${formatNumber(video.likes)}</strong><span>点赞</span></div>
+              <div class="stat-pair"><strong>+${formatNumber(video.deltaViews24h)}</strong><span>24h增量</span></div>
+            </div>
+            ${showAction ? `<p class="feature-card-copy">先看：${escapeHtml(compactAction(video.action, defaultActionForVideo(video)))}</p>` : ""}
+          </article>
+        `;
+      }
+
+      function renderFeaturedHeroCard(video, index, renderOptions, featuredMode = "default") {
+        return renderFeaturedCard(video, index, renderOptions, featuredMode).replace('class="feature-card ', 'class="feature-card feature-card--hero ');
+      }
+
+      function renderFeaturedMiniCard(video, index, featuredMode = "default") {
+        const toneClass = getVideoCardClass(video).replace("video-card", "feature-mini");
+        return `
+          <article class="feature-mini ${toneClass}">
+            <div class="feature-card-rank">${index + 1}</div>
+            <div>
+              ${featuredMode === "theme" ? `<div class="feature-role">${escapeHtml(getFeaturedBucketLabel(video, featuredMode))}</div>` : ""}
+              <strong>${escapeHtml(video.accountHandle)} · ${escapeHtml(video.theme)}</strong>
+              <span>发布 ${escapeHtml(shortDate(video.publishedAt))}｜${video.label ? escapeHtml(video.label) : getFeaturedBucketLabel(video, featuredMode)}</span>
+            </div>
+            <div class="mini-metric">
+              <strong>${formatNumber(video.deltaViews24h || video.likes)}</strong>
+              <span>${video.deltaViews24h ? "24h增量" : "当前点赞"}</span>
+            </div>
+          </article>
+        `;
+      }
+
+      function renderThemeRoleCatalog(videos, renderOptions, featuredMode = "theme") {
+        const groups = [
+          { bucket: "signal", title: "爆点开场", note: "优先拆开场钩子和转发点" },
+          { bucket: "delta", title: "起量抄法", note: "优先看最近起量结构和节奏" },
+          { bucket: "engagement", title: "可抄参考", note: "优先看标题、叙事和互动触发" },
+          { bucket: "regular", title: "长尾参考", note: "补看稳定跑出来的老内容" }
+        ];
+        const byBucket = new Map(groups.map((group) => [group.bucket, []]));
+        for (const video of videos) {
+          const bucket = getFeaturedBucket(video);
+          if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+          byBucket.get(bucket).push(video);
+        }
+        return `
+          <div class="theme-role-groups">
+            <div class="theme-role-map">
+              ${groups.map((group) => {
+                const count = (byBucket.get(group.bucket) || []).length;
+                return `
+                  <article class="theme-role-map-card theme-role-map-card--${escapeHtml(group.bucket)}">
+                    <strong>${escapeHtml(group.title)}</strong>
+                    <span>${escapeHtml(group.note)}</span>
+                    <em>${formatNumber(count)} 条</em>
+                  </article>
+                `;
+              }).join("")}
+            </div>
+            ${groups
+              .map((group) => {
+                const items = (byBucket.get(group.bucket) || []).slice(0, group.bucket === "regular" ? 8 : 4);
+                if (!items.length) return "";
+                const [lead, ...rest] = items;
+                return `
+                  <section class="theme-role-group theme-role-group--${escapeHtml(group.bucket)}">
+                    <div class="theme-role-head">
+                      <div class="theme-role-title">
+                        <strong>${escapeHtml(group.title)}</strong>
+                        <p>${escapeHtml(group.note)}</p>
+                      </div>
+                      <span class="theme-role-count">${formatNumber(items.length)} 条</span>
+                    </div>
+                    ${renderThemeRoleSpotlight(lead, group, featuredMode)}
+                    <div class="theme-role-grid">
+                      ${rest.map((video, index) =>
+                        renderVideoWallCard(video, {
+                          ...renderOptions,
+                          showAction: false,
+                          wallMode: "theme",
+                          wallIndex: index + 1,
+                          featuredMode
+                        })
+                      ).join("")}
+                    </div>
+                  </section>
+                `;
+              })
+              .filter(Boolean)
+              .join("")}
+          </div>
+        `;
+      }
+
+      function renderThemeRoleSpotlight(video, group, featuredMode = "theme") {
+        if (!video) return "";
+        const actionText = compactAction(video.action, defaultActionForVideo(video));
+        const roleLabel = getFeaturedBucketLabel(video, featuredMode);
+        return `
+          <article class="theme-role-spotlight">
+            <div class="theme-role-spotlight-copy">
+              <span class="theme-role-kicker">${escapeHtml(roleLabel)}</span>
+              <div>
+                <strong>${escapeHtml(video.accountHandle)} · ${escapeHtml(video.theme)}</strong>
+                <p>先从这条切，优先看 ${escapeHtml(group.title)} 的具体拆法，再往下翻这一组的连续素材。</p>
+              </div>
+              <div class="theme-role-spotlight-meta">
+                <span class="tag">发布 ${escapeHtml(shortDate(video.publishedAt))}</span>
+                ${video.label ? `<span class="tag">${escapeHtml(video.label)}</span>` : ""}
+                <span class="tag">${escapeHtml(video.theme)}</span>
+              </div>
+              <div class="leaderboard-directive">
+                <strong>先做</strong>
+                <span>${escapeHtml(actionText)}</span>
+              </div>
+              <div class="theme-role-spotlight-links">
+                <a href="${video.url}" target="_blank" rel="noreferrer">先看这条</a>
+                <a href="#themeCatalogBlock" data-scroll-target="themeCatalogBlock">继续翻这组素材</a>
+              </div>
+            </div>
+            <div class="theme-role-spotlight-stats">
+              <div class="stat-pair"><strong>${formatNumber(video.views)}</strong><span>播放</span></div>
+              <div class="stat-pair"><strong>${formatNumber(video.likes)}</strong><span>点赞</span></div>
+              <div class="stat-pair"><strong>${formatNumber(video.shares)}</strong><span>分享</span></div>
+              <div class="stat-pair"><strong>+${formatNumber(video.deltaViews24h)}</strong><span>24h增量</span></div>
+            </div>
+          </article>
+        `;
+      }
+
+      function compactCue(item) {
+        const metric = item.metricValue && item.metricLabel
+          ? `${item.metricLabel} ${item.metricValue}`
+          : "";
+        const summary = item.subMetric || item.summary || item.reason || "";
+        return [metric, summary].filter(Boolean).join("｜") || "先看这条";
+      }
+
+      function getVideoCardClass(video) {
+        if (video.label && video.label !== "-") return "video-card--signal";
+        if (Number(video.deltaViews24h || 0) >= 10000 || Number(video.likes || 0) >= 5000) return "video-card--strong";
+        return "";
+      }
+
+      function getVideoCardFlag(video) {
+        if (video.label && video.label !== "-") {
+          return { label: video.label, className: "video-card-flag--signal" };
+        }
+        if (Number(video.deltaViews24h || 0) >= 10000) {
+          return { label: "24h增量高", className: "video-card-flag--strong" };
+        }
+        if (Number(video.likes || 0) >= 5000) {
+          return { label: "高点赞素材", className: "video-card-flag--strong" };
+        }
+        return null;
+      }
+
+      function isFeaturedVideo(video) {
+        return Boolean(video.label && video.label !== "-") || Number(video.deltaViews24h || 0) >= 10000 || Number(video.likes || 0) >= 5000;
+      }
+
+      function getLibrarySortLabel(mode) {
+        if (mode === "delta") return "24h增量";
+        if (mode === "views") return "播放最高";
+        return "最新发布";
+      }
+
+      function compareFeaturedRows(left, right) {
+        const leftBucket = getFeaturedBucketPriority(left);
+        const rightBucket = getFeaturedBucketPriority(right);
+        if (rightBucket !== leftBucket) return rightBucket - leftBucket;
+        if (right.deltaViews24h !== left.deltaViews24h) return right.deltaViews24h - left.deltaViews24h;
+        if (right.likes !== left.likes) return right.likes - left.likes;
+        if (right.shares !== left.shares) return right.shares - left.shares;
+        if (right.views !== left.views) return right.views - left.views;
+        return String(right.publishedAt || "").localeCompare(String(left.publishedAt || ""));
+      }
+
+      function selectFeaturedRows(videos, featuredMode = "default") {
+        const picks = [];
+        const used = new Set();
+        const buckets = featuredMode === "theme"
+          ? ["signal", "delta", "engagement"]
+          : ["signal", "delta", "engagement"];
+        for (const bucket of buckets) {
+          const match = videos.find((video) => !used.has(video.url || video.key) && getFeaturedBucket(video) === bucket);
+          if (match) {
+            used.add(match.url || match.key);
+            picks.push(match);
+          }
+        }
+        for (const video of videos) {
+          const key = video.url || video.key;
+          if (used.has(key)) continue;
+          used.add(key);
+          picks.push(video);
+          if (picks.length >= 3) break;
+        }
+        return picks.slice(0, 3);
+      }
+
+      function getFeaturedBucket(video) {
+        if (video.label && video.label !== "-") return "signal";
+        if (Number(video.deltaViews24h || 0) >= 10000) return "delta";
+        if (Number(video.likes || 0) >= 5000 || Number(video.shares || 0) >= 300) return "engagement";
+        return "regular";
+      }
+
+      function getFeaturedBucketLabel(video, featuredMode = "default") {
+        const bucket = getFeaturedBucket(video);
+        if (featuredMode === "theme") {
+          if (bucket === "signal") return "爆点开场";
+          if (bucket === "delta") return "起量抄法";
+          if (bucket === "engagement") return "可抄参考";
+          return "长尾参考";
+        }
+        if (bucket === "signal") return "爆点";
+        if (bucket === "delta") return "增量";
+        if (bucket === "engagement") return "可抄";
+        return "先翻";
+      }
+
+      function getFeaturedBucketPriority(video) {
+        const bucket = getFeaturedBucket(video);
+        if (bucket === "signal") return 4;
+        if (bucket === "delta") return 3;
+        if (bucket === "engagement") return 2;
+        return 1;
+      }
+
+      function compactAction(text, fallback = "先翻这条看看") {
+        const source = String(text || fallback || "").trim();
+        if (!source) return "先翻这条看看";
+        const cleaned = source
+          .replace(/^先做[:：]\s*/u, "")
+          .replace(/^动作[:：]\s*/u, "")
+          .replace(/\s+/gu, " ")
+          .trim();
+        const firstChunk = cleaned.split(/[。！？!?\n]/u).find(Boolean)?.trim() || cleaned;
+        const shortChunk = firstChunk.split(/[；;｜|]/u).find(Boolean)?.trim() || firstChunk;
+        return shortChunk.length > 24 ? `${shortChunk.slice(0, 24).trim()}…` : shortChunk;
+      }
+
+      function defaultActionForVideo(video) {
+        if (video.label && video.label !== "-") return "先看这条起量原因";
+        if (Number(video.deltaViews24h || 0) >= 10000) return "先看最近24h为什么在涨";
+        if (Number(video.likes || 0) >= 5000 || Number(video.shares || 0) >= 300) return "先拆标题、开场和转发点";
+        return "先翻这条看看";
+      }
+
+      function renderChipRow(options, activeValue, onSelect) {
+        return options.map((option) => `
+          <button class="chip ${option.value === activeValue ? "is-active" : ""}" data-value="${escapeHtml(String(option.value))}">${escapeHtml(option.label)}</button>
+        `).join("");
+      }
+
+      function setActiveMaterialTab(tab) {
+        document.querySelectorAll(".tab-button").forEach((button) => button.classList.toggle("is-active", button.dataset.tab === tab));
+        document.querySelectorAll(".tab-panel").forEach((panel) => {
+          panel.classList.toggle("is-active", panel.id === `tab-${tab}`);
+        });
+      }
+
+      function scrollToMaterialPool() {
+        document.getElementById("intel-center")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function scrollToElementById(id) {
+        if (!id) return;
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function openThemeMaterialPool(themeName) {
+        if (themeName) {
+          state.activeTheme = themeName;
+          renderThemeRail();
+        }
+        setActiveMaterialTab("theme");
+        scrollToMaterialPool();
+      }
+
+      function openAccountMaterialPool(handle) {
+        if (handle) {
+          state.activeHandle = handle;
+          renderAccounts();
+        }
+        setActiveMaterialTab("account");
+        scrollToMaterialPool();
+      }
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || !target.classList.contains("chip")) return;
+        const container = target.parentElement?.id;
+        const value = target.dataset.value;
+        if (container === "accountFilters") {
+          state.accountWindowDays = Number(value);
+          renderAccountFilters();
+          renderAccountDetail();
+        } else if (container === "themeFilters") {
+          state.themeWindowDays = Number(value);
+          renderThemeFilters();
+          renderThemeDetail();
+        } else if (container === "libraryWindowFilters") {
+          state.libraryWindowDays = Number(value);
+          renderLibraryControls();
+          renderLibraryRows();
+        } else if (container === "librarySortFilters") {
+          state.librarySort = value;
+          renderLibraryControls();
+          renderLibraryRows();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        const tabButton = target instanceof HTMLElement ? target.closest(".tab-button") : null;
+        const tab = tabButton?.dataset.tab;
+        if (!tab) return;
+        setActiveMaterialTab(tab);
+      });
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        const navLink = target instanceof HTMLElement ? target.closest("[data-nav]") : null;
+        const nav = navLink?.dataset.nav;
+        if (!nav) return;
+        event.preventDefault();
+        if (nav === "theme") {
+          openThemeMaterialPool(navLink.dataset.theme || "");
+          return;
+        }
+        if (nav === "account") {
+          openAccountMaterialPool(navLink.dataset.handle || "");
+          return;
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        const jumpLink = target instanceof HTMLElement ? target.closest("[data-scroll-target]") : null;
+        const scrollTarget = jumpLink?.dataset.scrollTarget;
+        if (!scrollTarget) return;
+        event.preventDefault();
+        scrollToElementById(scrollTarget);
+      });
+
+      function withinDays(value, days) {
+        if (!value) return false;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return false;
+        const diff = Date.now() - date.getTime();
+        return diff <= days * 24 * 60 * 60 * 1000;
+      }
+
+      function compareLibraryRows(left, right, mode) {
+        if (mode === "delta") {
+          if (right.deltaViews24h !== left.deltaViews24h) return right.deltaViews24h - left.deltaViews24h;
+          if (right.views !== left.views) return right.views - left.views;
+        } else if (mode === "views") {
+          if (right.views !== left.views) return right.views - left.views;
+          if (right.likes !== left.likes) return right.likes - left.likes;
+        } else {
+          const byPublished = String(right.publishedAt || "").localeCompare(String(left.publishedAt || ""));
+          if (byPublished !== 0) return byPublished;
+          if (right.deltaViews24h !== left.deltaViews24h) return right.deltaViews24h - left.deltaViews24h;
+        }
+        return left.rank - right.rank;
+      }
+
+      function formatNumber(value) {
+        return new Intl.NumberFormat("zh-CN").format(Number(value || 0));
+      }
+
+      function formatDate(value) {
+        if (!value) return "暂无";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return new Intl.DateTimeFormat("zh-CN", {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(date);
+      }
+
+      function shortDate(value) {
+        if (!value) return "未知";
+        return String(value).slice(5, 16).replace("T", " ");
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+    </script>
+  </body>
+</html>

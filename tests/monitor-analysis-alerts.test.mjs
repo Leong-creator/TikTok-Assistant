@@ -89,9 +89,12 @@ test("analyzeVideoSnapshots creates a lead-worthy signal for fast six-hour growt
   assert.equal(signals[0].entityUrl, "https://www.tiktok.com/@book_alpha/video/1");
   assert.equal(signals[0].deltas.views, 3600);
   assert.equal(signals[0].windowHours, 6);
+  assert.equal(signals[0].signalKind, "new_breakout");
+  assert.equal(signals[0].signalLabel, "3天内新爆");
   assert.ok(signals[0].score >= 70);
   assert.ok(signals[0].reasons.some((reason) => /6h views \+3600/.test(reason)));
   assert.equal(signals[0].recommendedAction, "create_lead");
+  assert.match(signals[0].operatorAction, /优先拆解/u);
 });
 
 test("analyzeVideoSnapshots creates a signal for fast three-hour view growth", () => {
@@ -125,6 +128,7 @@ test("analyzeVideoSnapshots creates a signal for fast three-hour view growth", (
   assert.equal(signals.length, 1);
   assert.equal(signals[0].windowHours, 3);
   assert.equal(signals[0].deltas.views, 3300);
+  assert.equal(signals[0].signalLabel, "3天内新爆");
   assert.ok(signals[0].reasons.some((reason) => /3h views \+3300/.test(reason)));
 });
 
@@ -162,6 +166,7 @@ test("analyzeVideoSnapshots falls back to interaction growth when views are unav
   assert.equal(signals[0].deltas.likes, 3300);
   assert.equal(signals[0].deltas.comments, 140);
   assert.equal(signals[0].deltas.shares, 670);
+  assert.equal(signals[0].signalKind, "new_breakout");
   assert.ok(signals[0].reasons.some((reason) => /interaction fallback/i.test(reason)));
 });
 

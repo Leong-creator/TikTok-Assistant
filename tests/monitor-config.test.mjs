@@ -20,9 +20,17 @@ test("resolveMonitorConfig defaults account monitoring to high coverage and thre
   const config = resolveMonitorConfig({});
 
   assert.equal(config.source, "cloakbrowser");
-  assert.equal(config.maxVideosPerAccount, 60);
+  assert.equal(config.maxVideosPerAccount, 120);
   assert.equal(config.maxTabs, 1);
   assert.equal(config.collectionIntervalHours, 3);
+  assert.equal(config.cloakbrowserEphemeral, true);
+  assert.equal(config.cloakbrowserHumanPreset, "careful");
+  assert.equal(config.cloakbrowserPostNavigateDelayMinMs, 1800);
+  assert.equal(config.cloakbrowserPostNavigateDelayMaxMs, 3600);
+  assert.equal(config.cloakbrowserPreSnapshotDelayMinMs, 1200);
+  assert.equal(config.cloakbrowserPreSnapshotDelayMaxMs, 2400);
+  assert.equal(config.cloakbrowserPreSnapshotScrollMinY, 320);
+  assert.equal(config.cloakbrowserPreSnapshotScrollMaxY, 920);
   assert.equal(config.min3hViews, 3000);
   assert.equal(config.min3hLikes, 3000);
   assert.equal(config.min3hShares, 500);
@@ -111,8 +119,9 @@ test("resolveMonitorConfig exposes CloakBrowser defaults", () => {
     TIKTOK_CLOAKBROWSER_SEED_PROFILE_DIR: "profiles/cloak/seed",
     TIKTOK_CLOAKBROWSER_HEADLESS: "false",
     TIKTOK_CLOAKBROWSER_FRESH: "false",
+    TIKTOK_CLOAKBROWSER_EPHEMERAL: "false",
     TIKTOK_CLOAKBROWSER_HUMANIZE: "true",
-    TIKTOK_CLOAKBROWSER_HUMAN_PRESET: "slow",
+    TIKTOK_CLOAKBROWSER_HUMAN_PRESET: "careful",
     TIKTOK_CLOAKBROWSER_LOCALE: "en-US",
     TIKTOK_CLOAKBROWSER_TIMEZONE: "America/New_York",
     TIKTOK_CLOAKBROWSER_PROXY: "http://127.0.0.1:8000"
@@ -123,9 +132,32 @@ test("resolveMonitorConfig exposes CloakBrowser defaults", () => {
   assert.equal(config.cloakbrowserSeedProfileDir, "profiles/cloak/seed");
   assert.equal(config.cloakbrowserHeadless, false);
   assert.equal(config.cloakbrowserFresh, false);
+  assert.equal(config.cloakbrowserEphemeral, false);
   assert.equal(config.cloakbrowserHumanize, true);
-  assert.equal(config.cloakbrowserHumanPreset, "slow");
+  assert.equal(config.cloakbrowserHumanPreset, "careful");
   assert.equal(config.cloakbrowserLocale, "en-US");
   assert.equal(config.cloakbrowserTimezone, "America/New_York");
   assert.equal(config.cloakbrowserProxy, "http://127.0.0.1:8000");
+});
+
+test("resolveMonitorConfig exposes Bright Data fallback settings", () => {
+  const config = resolveMonitorConfig({
+    TIKTOK_BRIGHTDATA_FALLBACK: "true",
+    TIKTOK_BRIGHTDATA_BROWSER_AUTH: "user:pass",
+    TIKTOK_BRIGHTDATA_BROWSER_WS_ENDPOINT: "wss://example-endpoint",
+    TIKTOK_BRIGHTDATA_CONNECT_TIMEOUT_MS: "45000",
+    TIKTOK_BRIGHTDATA_TIMEOUT_MS: "60000",
+    TIKTOK_BRIGHTDATA_SNAPSHOT_TIMEOUT_MS: "65000",
+    TIKTOK_BRIGHTDATA_SNAPSHOT_RETRIES: "5",
+    TIKTOK_BRIGHTDATA_SNAPSHOT_RETRY_DELAY_MS: "1500"
+  });
+
+  assert.equal(config.brightDataFallback, true);
+  assert.equal(config.brightDataBrowserAuth, "user:pass");
+  assert.equal(config.brightDataBrowserWsEndpoint, "wss://example-endpoint");
+  assert.equal(config.brightDataConnectTimeoutMs, 45000);
+  assert.equal(config.brightDataTimeoutMs, 60000);
+  assert.equal(config.brightDataSnapshotTimeoutMs, 65000);
+  assert.equal(config.brightDataSnapshotRetries, 5);
+  assert.equal(config.brightDataSnapshotRetryDelayMs, 1500);
 });

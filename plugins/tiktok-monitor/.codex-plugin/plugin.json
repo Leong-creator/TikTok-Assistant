@@ -1,7 +1,7 @@
 {
   "name": "tiktok-monitor",
   "version": "0.1.0",
-  "description": "Portable TikTok monitoring plugin that runs the repository collector through CoBrowser and the monitor CLI.",
+  "description": "Portable TikTok monitoring plugin that runs the repository collector through CloakBrowser and the monitor CLI.",
   "author": {
     "name": "Leong",
     "email": "Leong-creator@users.noreply.github.com",
@@ -13,15 +13,15 @@
   "keywords": [
     "tiktok",
     "monitor",
-    "cobrowser",
+    "cloakbrowser",
     "playwright",
     "feishu"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "TikTok monitor",
-    "shortDescription": "Run TikTok monitoring cycles through CoBrowser",
-    "longDescription": "TikTok monitor wraps the repository monitor CLI so Codex can refresh collection plans, run CoBrowser-backed collection, analyze snapshots, sync Feishu Base, and send operator-facing reports with one command.",
+    "shortDescription": "Run TikTok monitoring cycles through CloakBrowser",
+    "longDescription": "TikTok monitor wraps the repository monitor CLI so Codex can refresh collection plans, run CloakBrowser-backed humanized collection, analyze snapshots, sync Feishu Base, and send operator-facing reports with one command.",
     "developerName": "Leong",
     "category": "Engineering",
     "capabilities": [

@@ -38,7 +38,26 @@ test("buildMonitorReport summarizes tracked accounts, shops, and recent signals"
           entityType: "video",
           entityUrl: "https://www.tiktok.com/@book_alpha/video/1",
           accountHandle: "book_alpha",
+          signalKind: "new_breakout",
+          signalLabel: "3天内新爆",
           windowHours: 3,
+          current: {
+            videoUrl: "https://www.tiktok.com/@book_alpha/video/1",
+            postedAt: "2026-05-10T07:00:00.000Z",
+            views: 15600,
+            likes: 1100,
+            comments: 96,
+            shares: 72
+          },
+          currentMetrics: {
+            views: 15600,
+            likes: 1100,
+            comments: 96,
+            shares: 72
+          },
+          benchmark: {
+            viewMultiple: 2.4
+          },
           deltas: { views: 3600, likes: 200, comments: 20, shares: 10 },
           score: 88,
           detectedAt: "2026-05-10T09:00:00.000Z"
@@ -72,21 +91,24 @@ test("buildMonitorReport summarizes tracked accounts, shops, and recent signals"
       now: new Date("2026-05-10T12:00:00.000Z")
     });
 
-    assert.equal(result.summary.trackedAccounts, 2);
-    assert.equal(result.summary.candidateAccounts, 1);
-    assert.equal(result.summary.trackedShops, 1);
+    assert.equal(result.summary.trackedAccounts, 3);
     assert.equal(result.summary.recentSignals, 1);
+    assert.equal(result.summary.signalBuckets.recent3d, 1);
     assert.equal(result.summary.topSignals.length, 1);
-    assert.match(result.text, /TikTok运营监控简报/u);
-    assert.match(result.text, /监控池：正式账号 2 \| 候选账号 1 \| 商品入口 1/u);
-    assert.match(result.text, /今日结论：/u);
-    assert.match(result.text, /近24小时发现 1 条值得跟进的突增内容/u);
-    assert.match(result.text, /重点跟进内容：/u);
+    assert.equal(result.summary.topMustWatchVideos.length, 1);
+    assert.match(result.text, /TikTok同行晨会简报/u);
+    assert.match(result.text, /头号爆点主战区 TOP3：/u);
     assert.match(result.text, /book_alpha/u);
-    assert.match(result.text, /播放\+3600/u);
-    assert.match(result.text, /点赞\+200/u);
-    assert.match(result.text, /建议动作：/u);
+    assert.match(result.text, /24h播放 \+3,600/u);
+    assert.match(result.text, /高于常规 2.40x/u);
+    assert.match(result.text, /近7天可直接抄 TOP3：/u);
+    assert.match(result.text, /主题先翻 TOP3：/u);
+    assert.match(result.text, /今天先盯账号 TOP3：/u);
+    assert.match(result.text, /先做：/u);
+    assert.match(result.text, /今天顺序：先看新爆｜再翻主题｜再抄近期｜最后盯账号/u);
     assert.match(result.text, /https:\/\/example.com\/base\/monitor/u);
+    assert.doesNotMatch(result.text, /候选账号/u);
+    assert.doesNotMatch(result.text, /商品入口/u);
   } finally {
     await rm(dataDir, { recursive: true, force: true });
   }
@@ -105,14 +127,24 @@ test("buildMonitorReport falls back to the latest historical surge when no recen
     await writeFile(path.join(dataDir, "seeds", "shops.json"), "[]\n");
     await writeFile(
       path.join(dataDir, "signals", "signals.jsonl"),
-      JSON.stringify({
-        entityType: "video",
-        entityUrl: "https://www.tiktok.com/@book_alpha/video/1",
-        accountHandle: "book_alpha",
-        windowHours: 6,
-        deltas: { views: 5200, likes: 380, comments: 41, shares: 26 },
-        score: 91,
-        detectedAt: "2026-05-08T09:00:00.000Z"
+        JSON.stringify({
+          entityType: "video",
+          entityUrl: "https://www.tiktok.com/@book_alpha/video/1",
+          accountHandle: "book_alpha",
+          signalKind: "sustained_growth",
+          signalLabel: "4-7天持续涨",
+          windowHours: 6,
+          current: {
+            videoUrl: "https://www.tiktok.com/@book_alpha/video/1",
+            postedAt: "2026-05-07T09:00:00.000Z",
+            views: 25200,
+            likes: 1800,
+            comments: 210,
+            shares: 190
+          },
+          deltas: { views: 5200, likes: 380, comments: 41, shares: 26 },
+          score: 91,
+          detectedAt: "2026-05-08T09:00:00.000Z"
       }) + "\n"
     );
 
@@ -123,9 +155,9 @@ test("buildMonitorReport falls back to the latest historical surge when no recen
 
     assert.equal(result.summary.recentSignals, 0);
     assert.equal(result.summary.topSignals.length, 1);
-    assert.match(result.text, /近24小时暂未发现新的突增内容/u);
-    assert.match(result.text, /最近一次值得参考的突增内容/u);
-    assert.match(result.text, /播放\+5200/u);
+    assert.equal(result.summary.topMustWatchVideos.length, 1);
+    assert.match(result.text, /头号爆点主战区 TOP3：/u);
+    assert.match(result.text, /24h播放 \+5,200/u);
   } finally {
     await rm(dataDir, { recursive: true, force: true });
   }
@@ -134,6 +166,7 @@ test("buildMonitorReport falls back to the latest historical surge when no recen
 test("buildMonitorReport falls back to historical run snapshots when the root snapshot folder is empty", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-report-run-fallback-"));
   try {
+    const validVideoUrl = "https://www.tiktok.com/@book_alpha/video/7623225588626590990";
     await mkdir(path.join(dataDir, "seeds"), { recursive: true });
     await mkdir(path.join(dataDir, "chrome_run_a", "snapshots"), { recursive: true });
     await writeFile(
@@ -148,7 +181,8 @@ test("buildMonitorReport falls back to historical run snapshots when the root sn
         JSON.stringify({
           collectedAt: "2026-05-10T09:00:00.000Z",
           accountHandle: "book_alpha",
-          videoUrl: "https://www.tiktok.com/@book_alpha/video/1",
+          videoUrl: validVideoUrl,
+          postedAt: "2026-05-10T07:00:00.000Z",
           views: 1000,
           likes: 50,
           comments: 5,
@@ -157,7 +191,8 @@ test("buildMonitorReport falls back to historical run snapshots when the root sn
         JSON.stringify({
           collectedAt: "2026-05-10T12:00:00.000Z",
           accountHandle: "book_alpha",
-          videoUrl: "https://www.tiktok.com/@book_alpha/video/1",
+          videoUrl: validVideoUrl,
+          postedAt: "2026-05-10T07:00:00.000Z",
           views: 4500,
           likes: 260,
           comments: 19,
@@ -173,14 +208,14 @@ test("buildMonitorReport falls back to historical run snapshots when the root sn
 
     assert.equal(result.summary.trackedVideos, 1);
     assert.equal(result.summary.topSignals.length, 1);
-    assert.match(result.text, /数据覆盖：已采集 1 条视频/u);
-    assert.match(result.text, /播放\+3500/u);
+    assert.match(result.text, /监控池：账号池 1 \| 近90天视频 1/u);
+    assert.match(result.text, /24h播放 \+3,500/u);
   } finally {
     await rm(dataDir, { recursive: true, force: true });
   }
 });
 
-test("buildMonitorReport includes top recent seven-day published videos even when no surge exists", async () => {
+test("buildMonitorReport includes top recent seven-day strong videos even when no surge exists", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-report-recent-"));
   try {
     await mkdir(path.join(dataDir, "seeds"), { recursive: true });
@@ -211,6 +246,7 @@ test("buildMonitorReport includes top recent seven-day published videos even whe
           collectedAt: "2026-05-10T12:00:00.000Z",
           accountHandle: "book_alpha",
           videoUrl: `https://www.tiktok.com/@book_alpha/video/${recentVideoId}`,
+          views: 12000,
           likes: 1200,
           comments: 80,
           shares: 340
@@ -240,13 +276,318 @@ test("buildMonitorReport includes top recent seven-day published videos even whe
     });
 
     assert.equal(result.summary.topSignals.length, 0);
-    assert.equal(result.summary.topRecentPublishedVideos.length, 2);
-    assert.equal(result.summary.topRecentPublishedVideos[0].accountHandle, "book_alpha");
-    assert.match(result.text, /近24小时暂未发现新的突增内容/u);
-    assert.match(result.text, /近7天值得关注的新发视频/u);
+    assert.equal(result.summary.topRecentStrongVideos.length, 1);
+    assert.equal(result.summary.topMustWatchVideos.length, 1);
+    assert.equal(result.summary.topRecentStrongVideos[0].accountHandle, "book_alpha");
+    assert.match(result.text, /近7天可直接抄 TOP3：/u);
     assert.match(result.text, /book_alpha/u);
-    assert.match(result.text, /book_gamma/u);
-    assert.doesNotMatch(result.text, /book_beta/u);
+    assert.doesNotMatch(result.text, /book_gamma/u);
+    assert.match(result.text, /点赞 1,200/u);
+    assert.match(result.text, /今天先盯账号 TOP3：/u);
+    assert.match(result.text, /现在盯：/u);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("buildMonitorReport renders theme references as operator roles instead of raw aggregates", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-report-theme-role-"));
+  try {
+    await mkdir(path.join(dataDir, "seeds"), { recursive: true });
+    await mkdir(path.join(dataDir, "signals"), { recursive: true });
+    await mkdir(path.join(dataDir, "snapshots"), { recursive: true });
+    await writeFile(
+      path.join(dataDir, "seeds", "accounts.json"),
+      JSON.stringify([{ handle: "book_alpha", profileUrl: "https://www.tiktok.com/@book_alpha", enabled: true }])
+    );
+    await writeFile(path.join(dataDir, "seeds", "account_candidates.json"), "[]\n");
+    await writeFile(path.join(dataDir, "seeds", "shops.json"), "[]\n");
+    await writeFile(path.join(dataDir, "signals", "signals.jsonl"), "");
+    await writeFile(
+      path.join(dataDir, "snapshots", "video_snapshots.jsonl"),
+      [
+        JSON.stringify({
+          collectedAt: "2026-05-10T12:00:00.000Z",
+          accountHandle: "book_alpha",
+          videoUrl: "https://www.tiktok.com/@book_alpha/video/7623225588626590990",
+          postedAt: "2026-05-09T08:00:00.000Z",
+          views: 56000,
+          likes: 6200,
+          comments: 340,
+          shares: 520,
+          productRefs: [{ title: "people skills" }]
+        }),
+        JSON.stringify({
+          collectedAt: "2026-05-10T12:00:00.000Z",
+          accountHandle: "book_alpha",
+          videoUrl: "https://www.tiktok.com/@book_alpha/video/7623225588626590991",
+          postedAt: "2026-05-06T08:00:00.000Z",
+          views: 18000,
+          likes: 1500,
+          comments: 88,
+          shares: 120,
+          productRefs: [{ title: "people skills" }]
+        })
+      ].join("\n") + "\n"
+    );
+
+    const result = await buildMonitorReport({
+      dataDir,
+      now: new Date("2026-05-10T12:00:00.000Z")
+    });
+
+    assert.match(result.text, /主题先翻：people skills｜爆点开场/u);
+    assert.match(result.text, /主题先翻 TOP3：/u);
+    assert.match(result.text, /1\. people skills｜爆点开场｜高表现 2｜近7天上新 2/u);
+    assert.match(result.text, /代表 book_alpha｜发布/u);
+    assert.match(result.text, /先做：先拆代表视频的开场钩子和转发点/u);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("buildMonitorReport limits operator sections to top three items", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-report-top3-"));
+  try {
+    await mkdir(path.join(dataDir, "seeds"), { recursive: true });
+    await mkdir(path.join(dataDir, "signals"), { recursive: true });
+    await mkdir(path.join(dataDir, "snapshots"), { recursive: true });
+    await writeFile(
+      path.join(dataDir, "seeds", "accounts.json"),
+      JSON.stringify([
+        { handle: "alpha", profileUrl: "https://www.tiktok.com/@alpha", enabled: true },
+        { handle: "beta", profileUrl: "https://www.tiktok.com/@beta", enabled: true },
+        { handle: "gamma", profileUrl: "https://www.tiktok.com/@gamma", enabled: true },
+        { handle: "delta", profileUrl: "https://www.tiktok.com/@delta", enabled: true }
+      ])
+    );
+    await writeFile(path.join(dataDir, "seeds", "account_candidates.json"), "[]\n");
+    await writeFile(path.join(dataDir, "seeds", "shops.json"), "[]\n");
+    await writeFile(
+      path.join(dataDir, "signals", "signals.jsonl"),
+      [
+        {
+          accountHandle: "alpha",
+          entityUrl: "https://www.tiktok.com/@alpha/video/1",
+          score: 95,
+          views: 30000
+        },
+        {
+          accountHandle: "beta",
+          entityUrl: "https://www.tiktok.com/@beta/video/2",
+          score: 90,
+          views: 25000
+        },
+        {
+          accountHandle: "gamma",
+          entityUrl: "https://www.tiktok.com/@gamma/video/3",
+          score: 85,
+          views: 22000
+        },
+        {
+          accountHandle: "delta",
+          entityUrl: "https://www.tiktok.com/@delta/video/4",
+          score: 80,
+          views: 18000
+        }
+      ]
+        .map((item, index) =>
+          JSON.stringify({
+            entityType: "video",
+            accountHandle: item.accountHandle,
+            entityUrl: item.entityUrl,
+            signalKind: index === 0 ? "new_breakout" : "sustained_growth",
+            signalLabel: index === 0 ? "3天内新爆" : "4-7天持续涨",
+            windowHours: 6,
+            current: {
+              videoUrl: item.entityUrl,
+              postedAt: `2026-05-0${index + 6}T07:00:00.000Z`,
+              views: item.views,
+              likes: 1000 - index * 50,
+              comments: 80 - index * 5,
+              shares: 60 - index * 5
+            },
+            currentMetrics: {
+              views: item.views,
+              likes: 1000 - index * 50,
+              comments: 80 - index * 5,
+              shares: 60 - index * 5
+            },
+            benchmark: {
+              viewMultiple: 2 - index * 0.1
+            },
+            deltas: { views: 1000 - index * 100, likes: 100 - index * 10, comments: 10 - index, shares: 8 - index },
+            score: item.score,
+            detectedAt: `2026-05-10T0${index}:00:00.000Z`
+          })
+        )
+        .join("\n") + "\n"
+    );
+
+    const result = await buildMonitorReport({
+      dataDir,
+      now: new Date("2026-05-10T12:00:00.000Z")
+    });
+
+    assert.equal(result.summary.topMustWatchVideos.length, 3);
+    assert.equal(result.summary.topSignals.length, 3);
+    assert.equal(result.summary.recentStrongCount, 0);
+    assert.match(result.text, /1\. alpha/u);
+    assert.match(result.text, /2\. beta/u);
+    assert.match(result.text, /3\. gamma/u);
+    assert.doesNotMatch(result.text, /4\. delta/u);
+    assert.match(result.text, /近7天好素材 0 条/u);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("buildMonitorReport dedupes repeated signal rows for the same video and preserves publish time in must-watch text", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-report-dedupe-"));
+  try {
+    await mkdir(path.join(dataDir, "seeds"), { recursive: true });
+    await mkdir(path.join(dataDir, "signals"), { recursive: true });
+    await writeFile(
+      path.join(dataDir, "seeds", "accounts.json"),
+      JSON.stringify([{ handle: "alpha", profileUrl: "https://www.tiktok.com/@alpha", enabled: true }])
+    );
+    await writeFile(path.join(dataDir, "seeds", "account_candidates.json"), "[]\n");
+    await writeFile(path.join(dataDir, "seeds", "shops.json"), "[]\n");
+    await writeFile(
+      path.join(dataDir, "signals", "signals.jsonl"),
+      [
+        {
+          detectedAt: "2026-05-10T09:00:00.000Z",
+          score: 88,
+          views: 15600
+        },
+        {
+          detectedAt: "2026-05-10T10:00:00.000Z",
+          score: 89,
+          views: 16600
+        }
+      ]
+        .map((item) =>
+          JSON.stringify({
+            entityType: "video",
+            entityUrl: "https://www.tiktok.com/@alpha/video/7638481786569379086",
+            accountHandle: "alpha",
+            signalKind: "sustained_growth",
+            signalLabel: "4-7天持续涨",
+            windowHours: 6,
+            current: {
+              videoUrl: "https://www.tiktok.com/@alpha/video/7638481786569379086",
+              postedAt: "2026-05-11T04:11:02.000Z",
+              views: item.views,
+              likes: 1100,
+              comments: 96,
+              shares: 72
+            },
+            currentMetrics: {
+              views: item.views,
+              likes: 1100,
+              comments: 96,
+              shares: 72
+            },
+            benchmark: {
+              viewMultiple: 2.4
+            },
+            deltas: { views: 3600, likes: 200, comments: 20, shares: 10 },
+            score: item.score,
+            detectedAt: item.detectedAt
+          })
+        )
+        .join("\n") + "\n"
+    );
+
+    const result = await buildMonitorReport({
+      dataDir,
+      now: new Date("2026-05-10T12:00:00.000Z")
+    });
+
+    assert.equal(result.summary.recentSignals, 1);
+    assert.equal(result.summary.signalBuckets.recent7d, 1);
+    assert.equal(result.summary.topSignals.length, 1);
+    assert.equal(result.summary.topMustWatchVideos.length, 1);
+    assert.match(result.text, /发布 2026-05-11 12:11:02/u);
+    assert.match(result.text, /近7天好素材 0 条/u);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("buildMonitorReport uses whitelist accounts as the tracked pool when provided", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-report-whitelist-"));
+  try {
+    await mkdir(path.join(dataDir, "seeds"), { recursive: true });
+    await mkdir(path.join(dataDir, "signals"), { recursive: true });
+    await mkdir(path.join(dataDir, "snapshots"), { recursive: true });
+    await writeFile(
+      path.join(dataDir, "seeds", "accounts.json"),
+      JSON.stringify([
+        { handle: "legacy_alpha", profileUrl: "https://www.tiktok.com/@legacy_alpha", enabled: true },
+        { handle: "legacy_beta", profileUrl: "https://www.tiktok.com/@legacy_beta", enabled: true }
+      ])
+    );
+    await writeFile(path.join(dataDir, "seeds", "account_candidates.json"), "[]\n");
+    await writeFile(path.join(dataDir, "seeds", "shops.json"), "[]\n");
+    await writeFile(
+      path.join(dataDir, "signals", "signals.jsonl"),
+      JSON.stringify({
+        entityType: "video",
+        entityUrl: "https://www.tiktok.com/@white_alpha/video/7623225588626590990",
+        accountHandle: "white_alpha",
+        signalKind: "new_breakout",
+        signalLabel: "3天内新爆",
+        current: { videoUrl: "https://www.tiktok.com/@white_alpha/video/7623225588626590990", postedAt: "2026-05-10T07:00:00.000Z", views: 10000, likes: 1000, comments: 10, shares: 20 },
+        currentMetrics: { views: 10000, likes: 1000, comments: 10, shares: 20 },
+        deltas: { views: 3000, likes: 100, comments: 2, shares: 5 },
+        detectedAt: "2026-05-10T09:00:00.000Z",
+        score: 80
+      }) + "\n"
+    );
+    await writeFile(
+      path.join(dataDir, "snapshots", "video_snapshots.jsonl"),
+      JSON.stringify({
+        collectedAt: "2026-05-10T10:00:00.000Z",
+        accountHandle: "white_alpha",
+        videoUrl: "https://www.tiktok.com/@white_alpha/video/7623225588626590990",
+        postedAt: "2026-05-10T07:00:00.000Z",
+        views: 10000,
+        likes: 1000,
+        comments: 10,
+        shares: 20
+      }) + "\n"
+    );
+
+    const result = await buildMonitorReport({
+      dataDir,
+      now: new Date("2026-05-10T12:00:00.000Z"),
+      whitelistAccounts: [
+        {
+          handle: "white_alpha",
+          accountName: "white_alpha",
+          profileUrl: "https://www.tiktok.com/@white_alpha",
+          sourceTables: ["People Skills"],
+          materialTypes: ["AI动画"],
+          skipTracking: false
+        },
+        {
+          handle: "skip_me",
+          accountName: "skip_me",
+          profileUrl: "https://www.tiktok.com/@skip_me",
+          sourceTables: ["Raise Children"],
+          materialTypes: ["AI动画"],
+          remark: "橱窗已掉",
+          skipTracking: true
+        }
+      ]
+    });
+
+    assert.equal(result.summary.trackedAccounts, 1);
+    assert.match(result.text, /监控池：账号池 1 \| 近90天视频 1/u);
+    assert.match(result.text, /white_alpha/u);
+    assert.doesNotMatch(result.text, /legacy_alpha/u);
   } finally {
     await rm(dataDir, { recursive: true, force: true });
   }
@@ -282,7 +623,8 @@ test("sendMonitorReport sends one Feishu report message and writes a report log"
     assert.equal(result.sent, 1);
     assert.equal(result.failed, 0);
     assert.equal(calls.length, 1);
-    assert.match(calls[0].text, /TikTok运营监控简报/u);
+    assert.match(calls[0].text, /TikTok同行晨会简报/u);
+    assert.doesNotMatch(calls[0].text, /候选账号/u);
 
     const reportLog = (await readFile(path.join(dataDir, "reports", "reports.jsonl"), "utf8"))
       .trim()

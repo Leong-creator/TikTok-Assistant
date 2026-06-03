@@ -76,7 +76,16 @@ export function ensureSeededProfile({ profileDir, seedProfileDir, sourceProfileD
   fs.rmSync(tmpDir, { recursive: true, force: true });
   fs.mkdirSync(tmpDir, { recursive: true });
   copyDirBestEffort(sourceDir, tmpDir);
-  fs.renameSync(tmpDir, targetDir);
+  try {
+    fs.renameSync(tmpDir, targetDir);
+  } catch (error) {
+    if (!isRenameLockError(error)) {
+      throw error;
+    }
+    fs.rmSync(targetDir, { recursive: true, force: true });
+    copyDirBestEffort(tmpDir, targetDir);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
   return true;
 }
 
@@ -119,4 +128,9 @@ function copyDirBestEffort(source, target) {
       // Busy profile-adjacent files are copied best effort to match the OpenClaw runtime behavior.
     }
   }
+}
+
+function isRenameLockError(error) {
+  const code = error?.code;
+  return code === "EPERM" || code === "EBUSY" || code === "EACCES";
 }

@@ -43,4 +43,5 @@ node scripts/package-release.mjs
 
 - This plugin does not scrape cookies, passwords, or localStorage.
 - This plugin is a wrapper around the repository monitor CLI; it does not replace the repository logic.
-- The default cycle command uses `monitor-cycle --source cloakbrowser` with small single-tab batches.
+- The default cycle command uses `monitor-cycle --source cloakbrowser` with a single-tab humanized profile, larger video batches, and enough batch iterations to finish one full plan in normal conditions.
+- The default collect-batch command uses the same CloakBrowser humanized settings but only advances one bounded batch.

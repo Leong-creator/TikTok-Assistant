@@ -10,6 +10,7 @@ import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@model
 import { z } from "zod";
 
 import { startScriptWorkflow } from "./app-tools.mjs";
+import { buildOperatorDashboardData } from "./monitor/operator-dashboard.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WIDGET_URI = "ui://tiktok-producer/widget.html";
@@ -35,6 +36,10 @@ export const TOOL_DEFINITIONS = [
 
 export async function loadWidgetHtml() {
   return readFile(path.resolve(__dirname, "../public/tiktok-producer-widget.html"), "utf8");
+}
+
+export async function loadMonitorDashboardHtml() {
+  return readFile(path.resolve(__dirname, "../public/tiktok-monitor-dashboard.html"), "utf8");
 }
 
 export function createTikTokProducerServer() {
@@ -104,6 +109,26 @@ export function createHttpServer() {
 
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }).end("TikTok素材制作助手 MCP server");
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/monitor-dashboard") {
+      const html = await loadMonitorDashboardHtml();
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(html);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/monitor-dashboard") {
+      writeCors(res);
+      try {
+        const dataDir = String(url.searchParams.get("dataDir") ?? "monitoring_data");
+        const data = await buildOperatorDashboardData({ dataDir });
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }).end(JSON.stringify(data));
+      } catch (error) {
+        res
+          .writeHead(500, { "content-type": "application/json; charset=utf-8" })
+          .end(JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }));
+      }
       return;
     }
 

@@ -7,23 +7,13 @@ import { fileURLToPath } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(path.join(scriptDir, ".."));
 const bundledCliPath = path.join(pluginRoot, "dist", "runtime", "monitor-cli.mjs");
+let execFileSyncImpl = execFileSync;
+
+export function __setExecFileSyncForTests(fn) {
+  execFileSyncImpl = fn ?? execFileSync;
+}
 
 export function mapCommand(name, monitorDataDir) {
-  if (name === "cycle") {
-    return [
-      "monitor-cycle",
-      "--source",
-      "cloakbrowser",
-      "--data-dir",
-      monitorDataDir,
-      "--max-tabs",
-      "1",
-      "--max-seed-videos",
-      "1",
-      "--max-accounts",
-      "1"
-    ];
-  }
   if (name === "collect-batch") {
     return [
       "collect-cloakbrowser-batch",
@@ -32,10 +22,17 @@ export function mapCommand(name, monitorDataDir) {
       "--max-tabs",
       "1",
       "--max-seed-videos",
-      "1",
+      "20",
       "--max-accounts",
-      "1"
+      "1",
+      "--cloakbrowser-humanize",
+      "true",
+      "--cloakbrowser-human-preset",
+      "careful"
     ];
+  }
+  if (name === "base-sync-manual") {
+    return ["base-sync-manual", "--data-dir", monitorDataDir];
   }
   if (name === "status") {
     return ["collect-status", "--data-dir", monitorDataDir];
@@ -44,26 +41,21 @@ export function mapCommand(name, monitorDataDir) {
 }
 
 export function resolveRuntime(explicitRoot, cwd = process.cwd()) {
-  if (explicitRoot) {
+  try {
     const repoRoot = resolveMonitorRepoRoot(explicitRoot, cwd);
     return {
       cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
       cwd: repoRoot
     };
+  } catch (error) {
+    if (!explicitRoot && fs.existsSync(bundledCliPath)) {
+      return {
+        cliPath: bundledCliPath,
+        cwd
+      };
+    }
+    throw error;
   }
-
-  if (fs.existsSync(bundledCliPath)) {
-    return {
-      cliPath: bundledCliPath,
-      cwd
-    };
-  }
-
-  const repoRoot = resolveMonitorRepoRoot(explicitRoot, cwd);
-  return {
-    cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
-    cwd: repoRoot
-  };
 }
 
 export function resolveMonitorRepoRoot(explicitRoot, cwd = process.cwd()) {
@@ -94,10 +86,64 @@ export function resolveMonitorRepoRoot(explicitRoot, cwd = process.cwd()) {
 }
 
 function execNodeScript(scriptPath, scriptArgs = [], cwd = process.cwd()) {
-  execFileSync("node", [path.resolve(scriptPath), ...scriptArgs], {
+  execFileSyncImpl("node", [path.resolve(scriptPath), ...scriptArgs], {
     cwd,
     stdio: "inherit"
   });
+}
+
+function execNodeScriptJson(scriptPath, scriptArgs = [], cwd = process.cwd()) {
+  const stdout = execFileSyncImpl("node", [path.resolve(scriptPath), ...scriptArgs], {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"]
+  });
+  return JSON.parse(stdout);
+}
+
+function countSnapshotLines(dataDir, cwd = process.cwd()) {
+  const snapshotPath = path.join(cwd, dataDir, "snapshots", "video_snapshots.jsonl");
+  if (!fs.existsSync(snapshotPath)) {
+    return 0;
+  }
+  const text = fs.readFileSync(snapshotPath, "utf8");
+  if (!text) {
+    return 0;
+  }
+  return text.split(/\r?\n/u).filter(Boolean).length;
+}
+
+export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterations = 200) {
+  const beforeSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
+  const batches = [];
+  let refreshPlan = true;
+
+  for (let index = 0; index < maxIterations; index += 1) {
+    const commandArgs = mapCommand("collect-batch", monitorDataDir);
+    if (refreshPlan) {
+      commandArgs.push("--refresh-plan");
+    }
+    const batchResult = execNodeScriptJson(runtime.cliPath, [...commandArgs, ...extraArgs], runtime.cwd);
+    batches.push(batchResult);
+    refreshPlan = false;
+    if (batchResult.cursor?.completed || batchResult.batch?.done) {
+      break;
+    }
+  }
+
+  const afterSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
+  const baseSync = execNodeScriptJson(runtime.cliPath, mapCommand("base-sync-manual", monitorDataDir), runtime.cwd);
+  const status = execNodeScriptJson(runtime.cliPath, mapCommand("status", monitorDataDir), runtime.cwd);
+
+  return {
+    source: "cloakbrowser",
+    mode: "manual-base-safe-cycle",
+    newSnapshotLines: Math.max(0, afterSnapshots - beforeSnapshots),
+    batches,
+    batchCount: batches.length,
+    baseSync,
+    status
+  };
 }
 
 function main(argv = process.argv.slice(2)) {
@@ -111,6 +157,11 @@ function main(argv = process.argv.slice(2)) {
 
   const runtime = resolveRuntime(process.env.TIKTOK_MONITOR_REPO);
   const dataDir = process.env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_data";
+  if (command === "cycle") {
+    const result = runSafeCycle(runtime, dataDir, extraArgs);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
   const commandArgs = mapCommand(command, dataDir);
   execNodeScript(runtime.cliPath, [...commandArgs, ...extraArgs], runtime.cwd);
 }
