@@ -12,7 +12,7 @@ Codex plugin pages primarily surface plugin metadata and skills, not raw script 
 - Falls back to the repository source tree when the bundle is absent
 - Defaults to `CloakBrowser` for real collection
 - Uses a slow single-tab humanized collection profile by default
-- Runs the full `collect -> analyze -> base-sync -> report` cycle by default
+- Locks the stable one-plan `cycle -> manual base sync` wrapper as the only formal execution path
 - Reminds the user about first-time setup
 
 ## First-time setup
@@ -55,8 +55,8 @@ That command builds:
 
 ```powershell
 node scripts/tiktok-monitor.mjs cycle
-node scripts/tiktok-monitor.mjs collect-batch
 node scripts/tiktok-monitor.mjs status
+node scripts/tiktok-monitor.mjs sync
 node scripts/tiktok-monitor.mjs setup
 ```
 
@@ -72,11 +72,19 @@ If the bundle is absent and `TIKTOK_MONITOR_REPO` is not set, the plugin tries:
 - parent directories of current working directory
 - sibling folders named `TikTok Project Monitor`
 
-## Default command mapping
+## Formal command contract
 
-- `cycle` -> `node src/monitor-cli.mjs monitor-cycle --source cloakbrowser --max-tabs 1 --max-batch-iterations 120 --max-seed-videos 20 --max-accounts 1 --cloakbrowser-humanize true --cloakbrowser-human-preset careful`
-- `collect-batch` -> `node src/monitor-cli.mjs collect-cloakbrowser-batch --max-tabs 1 --max-seed-videos 20 --max-accounts 1 --cloakbrowser-humanize true --cloakbrowser-human-preset careful`
-- `status` -> `node src/monitor-cli.mjs collect-status`
+- `cycle`
+  - first batch refreshes the plan
+  - subsequent batches stay on the same `planCreatedAt`
+  - stop as soon as the current plan completes
+  - then run exactly one `base-sync-manual`
+- `status`
+  - reads the current plan and cursor only
+- `sync`
+  - runs the approved append-only `base-sync-manual`
+
+Do not rebuild the flow with ad hoc `collect-cloakbrowser-batch` loops or `monitor-cycle`.
 
 ## Publication / migration shape
 

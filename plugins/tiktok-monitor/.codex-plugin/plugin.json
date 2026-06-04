@@ -1,7 +1,7 @@
 {
   "name": "tiktok-monitor",
   "version": "0.1.0",
-  "description": "Portable TikTok monitoring plugin that runs the repository collector through CloakBrowser and the monitor CLI.",
+  "description": "Portable TikTok monitoring plugin that locks the repository's stable CloakBrowser collection wrapper and append-only Base sync path.",
   "author": {
     "name": "Leong",
     "email": "Leong-creator@users.noreply.github.com",
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "TikTok monitor",
-    "shortDescription": "Run TikTok monitoring cycles through CloakBrowser",
-    "longDescription": "TikTok monitor wraps the repository monitor CLI so Codex can refresh collection plans, run CloakBrowser-backed humanized collection, analyze snapshots, sync Feishu Base, and send operator-facing reports with one command.",
+    "shortDescription": "Run the locked stable TikTok collection wrapper",
+    "longDescription": "TikTok monitor is the formal execution wrapper for the repository's stable whitelist collection flow: single-plan CloakBrowser batches, rollover guardrails, and append-only Feishu Base sync.",
     "developerName": "Leong",
     "category": "Engineering",
     "capabilities": [
@@ -33,9 +33,9 @@
     "privacyPolicyURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/privacy.md",
     "termsOfServiceURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/terms.md",
     "defaultPrompt": [
-      "Use TikTok monitor to run one full monitoring cycle.",
-      "Use TikTok monitor to check collection status.",
-      "Use TikTok monitor setup to review first-time configuration."
+      "Use TikTok monitor cycle to run the approved stable whitelist collection flow.",
+      "Use TikTok monitor status to inspect the current collection plan and cursor.",
+      "Use TikTok monitor sync to run the approved append-only Base sync only."
     ],
     "brandColor": "#111827",
     "composerIcon": "./assets/tiktok-monitor.svg",

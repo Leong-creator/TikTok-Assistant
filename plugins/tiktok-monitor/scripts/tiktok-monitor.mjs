@@ -8,6 +8,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(path.join(scriptDir, ".."));
 const bundledCliPath = path.join(pluginRoot, "dist", "runtime", "monitor-cli.mjs");
 let execFileSyncImpl = execFileSync;
+const supportedUserCommands = new Set(["cycle", "status", "sync", "setup"]);
 
 export function __setExecFileSyncForTests(fn) {
   execFileSyncImpl = fn ?? execFileSync;
@@ -28,10 +29,12 @@ export function mapCommand(name, monitorDataDir) {
       "--cloakbrowser-humanize",
       "true",
       "--cloakbrowser-human-preset",
-      "careful"
+      "careful",
+      "--disable-plan-rollover",
+      "true"
     ];
   }
-  if (name === "base-sync-manual") {
+  if (name === "sync") {
     return ["base-sync-manual", "--data-dir", monitorDataDir];
   }
   if (name === "status") {
@@ -113,10 +116,14 @@ function countSnapshotLines(dataDir, cwd = process.cwd()) {
   return text.split(/\r?\n/u).filter(Boolean).length;
 }
 
-export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterations = 200) {
+export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterations = 1000) {
   const beforeSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
   const batches = [];
   let refreshPlan = true;
+  let trackedPlanCreatedAt = null;
+  let rolloverDetected = false;
+  let rolloverCursor = null;
+  let cycleCompleted = false;
 
   for (let index = 0; index < maxIterations; index += 1) {
     const commandArgs = mapCommand("collect-batch", monitorDataDir);
@@ -124,16 +131,54 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
       commandArgs.push("--refresh-plan");
     }
     const batchResult = execNodeScriptJson(runtime.cliPath, [...commandArgs, ...extraArgs], runtime.cwd);
+    if (!trackedPlanCreatedAt) {
+      trackedPlanCreatedAt = batchResult.cursor?.planCreatedAt ?? null;
+    } else if (
+      trackedPlanCreatedAt &&
+      batchResult.cursor?.planCreatedAt &&
+      batchResult.cursor.planCreatedAt !== trackedPlanCreatedAt
+    ) {
+      rolloverDetected = true;
+      rolloverCursor = batchResult.cursor;
+      break;
+    }
     batches.push(batchResult);
     refreshPlan = false;
     if (batchResult.cursor?.completed || batchResult.batch?.done) {
+      cycleCompleted = true;
       break;
     }
   }
 
   const afterSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
-  const baseSync = execNodeScriptJson(runtime.cliPath, mapCommand("base-sync-manual", monitorDataDir), runtime.cwd);
   const status = execNodeScriptJson(runtime.cliPath, mapCommand("status", monitorDataDir), runtime.cwd);
+  if (rolloverDetected) {
+    return {
+      source: "cloakbrowser",
+      mode: "manual-base-safe-cycle",
+      newSnapshotLines: Math.max(0, afterSnapshots - beforeSnapshots),
+      batches,
+      batchCount: batches.length,
+      trackedPlanCreatedAt,
+      rolloverDetected,
+      rolloverCursor,
+      status
+    };
+  }
+  if (!cycleCompleted) {
+    return {
+      source: "cloakbrowser",
+      mode: "manual-base-safe-cycle",
+      newSnapshotLines: Math.max(0, afterSnapshots - beforeSnapshots),
+      batches,
+      batchCount: batches.length,
+      trackedPlanCreatedAt,
+      rolloverDetected: false,
+      iterationLimitReached: true,
+      status
+    };
+  }
+  const baseSync = execNodeScriptJson(runtime.cliPath, mapCommand("sync", monitorDataDir), runtime.cwd);
 
   return {
     source: "cloakbrowser",
@@ -141,6 +186,8 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
     newSnapshotLines: Math.max(0, afterSnapshots - beforeSnapshots),
     batches,
     batchCount: batches.length,
+    trackedPlanCreatedAt,
+    rolloverDetected,
     baseSync,
     status
   };
@@ -149,6 +196,12 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
 function main(argv = process.argv.slice(2)) {
   const command = argv[0] ?? "cycle";
   const extraArgs = argv.slice(1);
+
+  if (!supportedUserCommands.has(command)) {
+    throw new Error(
+      `Unsupported TikTok monitor plugin command: ${command}. Use one of: cycle, status, sync, setup.`
+    );
+  }
 
   if (command === "setup") {
     execNodeScript(path.join(scriptDir, "setup.mjs"), extraArgs);
@@ -159,6 +212,18 @@ function main(argv = process.argv.slice(2)) {
   const dataDir = process.env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_data";
   if (command === "cycle") {
     const result = runSafeCycle(runtime, dataDir, extraArgs);
+    console.log(JSON.stringify(result, null, 2));
+    if (result.rolloverDetected || result.iterationLimitReached) {
+      process.exitCode = 1;
+    }
+    return;
+  }
+  if (command === "sync") {
+    execNodeScript(runtime.cliPath, mapCommand("sync", dataDir), runtime.cwd);
+    return;
+  }
+  if (command === "status") {
+    const result = execNodeScriptJson(runtime.cliPath, mapCommand("status", dataDir), runtime.cwd);
     console.log(JSON.stringify(result, null, 2));
     return;
   }

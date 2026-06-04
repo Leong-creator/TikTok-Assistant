@@ -8,16 +8,20 @@ description: Use when Codex should run the TikTok monitoring pipeline through Cl
 Use this plugin when the task is:
 
 - run one full TikTok monitor cycle
-- continue bounded CloakBrowser-backed collection
 - inspect collection status
+- run the approved append-only Base sync
 - explain first-time setup requirements
+
+This plugin is the **only formal execution path** for TikTok monitoring in this repository.
+Do **not** re-create the flow by manually chaining `collect-cloakbrowser-batch`, `monitor-cycle`,
+or ad hoc loops unless you are explicitly repairing the plugin implementation itself.
 
 ## Default commands
 
 ```powershell
 node scripts/tiktok-monitor.mjs cycle
-node scripts/tiktok-monitor.mjs collect-batch
 node scripts/tiktok-monitor.mjs status
+node scripts/tiktok-monitor.mjs sync
 node scripts/tiktok-monitor.mjs setup
 ```
 
@@ -43,5 +47,6 @@ node scripts/package-release.mjs
 
 - This plugin does not scrape cookies, passwords, or localStorage.
 - This plugin is a wrapper around the repository monitor CLI; it does not replace the repository logic.
-- The default cycle command uses `monitor-cycle --source cloakbrowser` with a single-tab humanized profile, larger video batches, and enough batch iterations to finish one full plan in normal conditions.
-- The default collect-batch command uses the same CloakBrowser humanized settings but only advances one bounded batch.
+- The default cycle command follows the proven stable wrapper shape: first batch refreshes the plan, later batches stay on the same plan, and the run stops as soon as the current plan reaches completion.
+- If the active `planCreatedAt` changes during a cycle, treat that as rollover and stop; do not silently keep collecting into a new plan.
+- Do not use direct repository commands such as `monitor-cycle` or manual `collect-cloakbrowser-batch` loops as a normal operating path.

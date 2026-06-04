@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
@@ -25,9 +26,11 @@ test("plugin command mapping keeps formal cloakbrowser batch and manual sync ent
     "--cloakbrowser-humanize",
     "true",
     "--cloakbrowser-human-preset",
-    "careful"
+    "careful",
+    "--disable-plan-rollover",
+    "true"
   ]);
-  assert.deepEqual(mapCommand("base-sync-manual", "monitoring_data"), [
+  assert.deepEqual(mapCommand("sync", "monitoring_data"), [
     "base-sync-manual",
     "--data-dir",
     "monitoring_data"
@@ -68,6 +71,16 @@ test("plugin runtime can discover the monitor repo from a nearby cwd when no exp
   }
 });
 
+test("plugin CLI rejects direct bottom-layer commands", () => {
+  const scriptPath = path.resolve("plugins/tiktok-monitor/scripts/tiktok-monitor.mjs");
+  const result = spawnSync(process.execPath, [scriptPath, "collect-batch"], {
+    cwd: path.resolve("."),
+    encoding: "utf8"
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Unsupported TikTok monitor plugin command: collect-batch/);
+});
+
 test("runSafeCycle loops collect-batch to completion and finishes with manual base sync", async () => {
   const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-cycle-"));
   try {
@@ -88,11 +101,11 @@ test("runSafeCycle loops collect-batch to completion and finishes with manual ba
         cursor: { accountIndex: 1, videoIndex: 30, completed: true }
       },
       {
-        inserted: { archive: 3, likes: 1, increments: 0 }
-      },
-      {
         plan: { counts: { accounts: 1, accountTargets: 1, videoTargets: 30 } },
         cursor: { accountIndex: 1, videoIndex: 30, completed: true }
+      },
+      {
+        inserted: { archive: 3, likes: 1, increments: 0 }
       }
     ];
     const calls = [];
@@ -117,14 +130,73 @@ test("runSafeCycle loops collect-batch to completion and finishes with manual ba
       assert.equal(result.batchCount, 2);
       assert.equal(result.status.cursor.completed, true);
       assert.equal(result.baseSync.inserted.likes, 1);
+      assert.equal(result.rolloverDetected, false);
       assert.deepEqual(
         calls.map((call) => call.args[1]),
         [
           "collect-cloakbrowser-batch",
           "collect-cloakbrowser-batch",
-          "base-sync-manual",
-          "collect-status"
+          "collect-status",
+          "base-sync-manual"
         ]
+      );
+    } finally {
+      module.__setExecFileSyncForTests?.(null);
+    }
+  } finally {
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("runSafeCycle stops before sync when a batch rolls into a different plan", async () => {
+  const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-rollover-"));
+  try {
+    await mkdir(path.join(repoRoot, "src"), { recursive: true });
+    await mkdir(path.join(repoRoot, "monitoring_data", "snapshots"), { recursive: true });
+    await writeFile(path.join(repoRoot, "src", "monitor-cli.mjs"), "export default null;\n");
+    await writeFile(path.join(repoRoot, "monitoring_data", "snapshots", "video_snapshots.jsonl"), "");
+
+    const outputs = [
+      {
+        batch: { accounts: 1, videos: 20, done: false },
+        snapshots: { video: 4, product: 0 },
+        cursor: { planCreatedAt: "plan-a", accountIndex: 1, videoIndex: 20, completed: false }
+      },
+      {
+        batch: { accounts: 0, videos: 20, done: false },
+        snapshots: { video: 4, product: 0 },
+        cursor: { planCreatedAt: "plan-b", accountIndex: 1, videoIndex: 40, completed: false }
+      },
+      {
+        plan: { counts: { accounts: 1, accountTargets: 1, videoTargets: 40 } },
+        cursor: { planCreatedAt: "plan-b", accountIndex: 1, videoIndex: 40, completed: false }
+      }
+    ];
+    const calls = [];
+    const runtime = {
+      cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
+      cwd: repoRoot
+    };
+    const fakeExecFileSync = (command, args, options) => {
+      calls.push({ command, args, cwd: options.cwd });
+      const next = outputs.shift();
+      if (!next) {
+        throw new Error("unexpected extra exec");
+      }
+      return JSON.stringify(next);
+    };
+
+    const module = await import("../plugins/tiktok-monitor/scripts/tiktok-monitor.mjs");
+    module.__setExecFileSyncForTests?.(fakeExecFileSync);
+    try {
+      const result = runSafeCycle(runtime, "monitoring_data", ["--dry-run"], 5);
+      assert.equal(result.rolloverDetected, true);
+      assert.equal(result.trackedPlanCreatedAt, "plan-a");
+      assert.equal(result.rolloverCursor.planCreatedAt, "plan-b");
+      assert.equal(result.baseSync, undefined);
+      assert.deepEqual(
+        calls.map((call) => call.args[1]),
+        ["collect-cloakbrowser-batch", "collect-cloakbrowser-batch", "collect-status"]
       );
     } finally {
       module.__setExecFileSyncForTests?.(null);

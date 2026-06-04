@@ -20,6 +20,7 @@ export async function runCloakBrowserMonitorBatch({
   refreshPlan = false,
   config = {}
 } = {}) {
+  const disablePlanRollover = Boolean(config.disablePlanRollover);
   if (shouldRefreshDiscovery({ refreshPlan, config })) {
     await runDiscoveryRefresh({ dataDir, now, config });
   }
@@ -32,7 +33,7 @@ export async function runCloakBrowserMonitorBatch({
     maxAccountTargets: numberOrDefault(config.maxAccounts, 1)
   });
 
-  if (batchState.batch.done && !refreshPlan && batchState.cursor?.completed) {
+  if (!disablePlanRollover && batchState.batch.done && !refreshPlan && batchState.cursor?.completed) {
     if (shouldRefreshDiscovery({ refreshPlan: true, config })) {
       await runDiscoveryRefresh({ dataDir, now, config });
     }

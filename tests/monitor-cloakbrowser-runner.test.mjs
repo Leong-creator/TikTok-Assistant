@@ -416,3 +416,54 @@ test("runCloakBrowserMonitorBatch advances only by the processed video count whe
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test("runCloakBrowserMonitorBatch does not auto-refresh into a new plan when plan rollover is disabled", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tk-monitor-cloak-no-rollover-"));
+  try {
+    await mkdir(path.join(dataDir, "state"), { recursive: true });
+    await writeFile(
+      path.join(dataDir, "state", "chrome_collect_plan.json"),
+      JSON.stringify(
+        {
+          createdAt: "2026-05-21T00:00:00.000Z",
+          counts: { accounts: 0, accountTargets: 0, videoTargets: 0 },
+          accountTargets: [],
+          videoTargets: []
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(
+      path.join(dataDir, "state", "chrome_collect_cursor.json"),
+      JSON.stringify(
+        {
+          planCreatedAt: "2026-05-21T00:00:00.000Z",
+          accountIndex: 0,
+          videoIndex: 0,
+          completed: true
+        },
+        null,
+        2
+      )
+    );
+
+    const result = await runCloakBrowserMonitorBatch({
+      dataDir,
+      now: new Date("2026-05-21T00:05:00.000Z"),
+      config: {
+        disablePlanRollover: true,
+        maxSeedVideos: 1,
+        maxAccounts: 1,
+        enableDiscoveryRefresh: false
+      }
+    });
+
+    assert.equal(result.batch.done, true);
+    assert.equal(result.planned.videoTargets, 0);
+    assert.equal(result.cursor.planCreatedAt, "2026-05-21T00:00:00.000Z");
+    assert.equal(result.cursor.completed, true);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
