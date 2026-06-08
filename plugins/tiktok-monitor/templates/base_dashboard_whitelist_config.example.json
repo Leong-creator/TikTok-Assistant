@@ -1,0 +1,9 @@
+{
+  "baseToken": "app_or_base_token_replace_me",
+  "url": "https://your-base-url-replace-me",
+  "tableNames": {
+    "accounts": "白名单追踪账号池",
+    "videos": "白名单追踪视频池",
+    "themes": "白名单主题参考库"
+  }
+}

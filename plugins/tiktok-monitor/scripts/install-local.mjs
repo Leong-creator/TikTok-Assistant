@@ -13,6 +13,7 @@ const homeMarketplacePath = path.join(homeRoot, ".agents", "plugins", "marketpla
 const codexConfigPath = path.join(homeRoot, ".codex", "config.toml");
 const buildScriptPath = path.join(scriptDir, "build-bundle.mjs");
 const args = new Set(process.argv.slice(2));
+const shouldRunSetup = !args.has("--skip-setup");
 const manifest = JSON.parse(await fs.readFile(path.join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
 const version = manifest.version || "0.1.0";
 const cacheRoot = path.join(homeRoot, ".codex", "plugins", "cache", "local-codex-plugins", "tiktok-monitor", version);
@@ -34,10 +35,15 @@ await fs.mkdir(path.dirname(homeMarketplacePath), { recursive: true });
 await fs.writeFile(homeMarketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`, "utf8");
 await enablePluginInCodexConfig(codexConfigPath);
 
+if (shouldRunSetup) {
+  await runNodeScript(path.join(targetRoot, "scripts", "setup.mjs"), [], { cwd: targetRoot });
+}
+
 console.log(JSON.stringify({
   plugin: "tiktok-monitor",
   installed: true,
   builtBundle: !args.has("--skip-build"),
+  setupRan: shouldRunSetup,
   version,
   source: pluginRoot,
   target: targetRoot,

@@ -10,6 +10,7 @@
   "homepage": "https://github.com/Leong-creator/TikTok-Assistant/tree/main/plugins/tiktok-monitor",
   "repository": "https://github.com/Leong-creator/TikTok-Assistant",
   "license": "MIT",
+  "hooks": "./hooks/hooks.json",
   "keywords": [
     "tiktok",
     "monitor",
@@ -33,7 +34,7 @@
     "privacyPolicyURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/privacy.md",
     "termsOfServiceURL": "https://github.com/Leong-creator/TikTok-Assistant/blob/main/docs/plugins/terms.md",
     "defaultPrompt": [
-      "Use TikTok monitor cycle to run the approved stable whitelist collection flow.",
+      "Use TikTok monitor cycle to run the approved stable whitelist collection flow. Use cycle --background for Codex automations or other time-limited shells.",
       "Use TikTok monitor status to inspect the current collection plan and cursor.",
       "Use TikTok monitor sync to run the approved append-only Base sync only."
     ],

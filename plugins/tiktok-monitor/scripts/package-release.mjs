@@ -108,7 +108,18 @@ Write-Host "Plugin: $PluginTarget"
 Write-Host "Cache: $PluginCache"
 Write-Host "Marketplace: $MarketplaceTarget"
 Write-Host "Codex config: $CodexConfig"
-Write-Host 'Next: refresh or reopen the Codex plugin page, then run node scripts/setup.mjs in the plugin folder once.'
+
+$SetupScript = Join-Path $PluginTarget 'scripts\\setup.mjs'
+if (Get-Command node -ErrorAction SilentlyContinue) {
+  Write-Host '正在自动执行 TikTok monitor 初始化检查...'
+  & node $SetupScript
+  if ($LASTEXITCODE -ne 0) {
+    throw "TikTok monitor 初始化检查失败，退出码: $LASTEXITCODE"
+  }
+} else {
+  Write-Host '未检测到 Node.js，请先安装 Node.js 后手动运行以下命令：'
+  Write-Host "node $SetupScript"
+}
 `.trimStart();
 }
 
@@ -142,12 +153,8 @@ function buildInstallGuide(versionText) {
 
 1. Unzip this package.
 2. Run \`install.ps1\`.
-3. Open Codex and refresh the plugin page if it was already open.
-4. Run:
-
-\`\`\`powershell
-node "$HOME\\plugins\\tiktok-monitor\\scripts\\setup.mjs"
-\`\`\`
+3. The installer auto-runs \`setup.mjs\` when Node.js is available.
+4. If setup reports manual steps, complete them in the generated Chinese guidance.
 
 ## First run
 

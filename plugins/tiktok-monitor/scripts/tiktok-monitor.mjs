@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,10 +8,25 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(path.join(scriptDir, ".."));
 const bundledCliPath = path.join(pluginRoot, "dist", "runtime", "monitor-cli.mjs");
 let execFileSyncImpl = execFileSync;
+let spawnImpl = spawn;
+let pidCheckImpl = defaultPidCheck;
 const supportedUserCommands = new Set(["cycle", "status", "sync", "setup"]);
+const backgroundCycleFlag = "--background";
+const forceRefreshPlanFlag = "--force-refresh-plan";
+const managedCycleStateFile = "tiktok-monitor-cycle-state.json";
+const managedCycleLogFile = "tiktok-monitor-cycle.log";
+const execJsonMaxBuffer = 16 * 1024 * 1024;
 
 export function __setExecFileSyncForTests(fn) {
   execFileSyncImpl = fn ?? execFileSync;
+}
+
+export function __setSpawnForTests(fn) {
+  spawnImpl = fn ?? spawn;
+}
+
+export function __setPidCheckForTests(fn) {
+  pidCheckImpl = fn ?? defaultPidCheck;
 }
 
 export function mapCommand(name, monitorDataDir) {
@@ -99,9 +114,194 @@ function execNodeScriptJson(scriptPath, scriptArgs = [], cwd = process.cwd()) {
   const stdout = execFileSyncImpl("node", [path.resolve(scriptPath), ...scriptArgs], {
     cwd,
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "inherit"]
+    stdio: ["ignore", "pipe", "inherit"],
+    maxBuffer: execJsonMaxBuffer
   });
   return JSON.parse(stdout);
+}
+
+function readCycleStatus(runtime, monitorDataDir) {
+  return execNodeScriptJson(runtime.cliPath, mapCommand("status", monitorDataDir), runtime.cwd);
+}
+
+function readManualBaseSyncState(runtimeCwd, dataDir) {
+  const statePath = path.join(runtimeCwd, dataDir, "state", "manual_base_sync_state.json");
+  if (!fs.existsSync(statePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(statePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function summarizeCollectionScope({ status, baseSyncState, batches = [] } = {}) {
+  const planCounts = status?.plan?.counts ?? {};
+  const batchPlanned = batches.find((batch) => batch?.planned)?.planned ?? null;
+  const collectorPlannedVideoTargets = Number(
+    batchPlanned?.videoTargets ?? planCounts.videoTargets ?? 0
+  );
+  return {
+    accountTargets: Number(planCounts.accountTargets ?? planCounts.accounts ?? 0),
+    currentPlanVideoTargets: Number(planCounts.videoTargets ?? 0),
+    archiveVideoCount: Number(baseSyncState?.counts?.archive ?? 0),
+    likesBoardCount: Number(baseSyncState?.counts?.likes ?? 0),
+    incrementBoardCount: Number(baseSyncState?.counts?.increments ?? 0),
+    collectorPlannedVideoTargets
+  };
+}
+
+function shouldResumeCurrentPlan(status) {
+  return Boolean(
+    status?.plan?.createdAt &&
+      status?.cursor &&
+      status.cursor.completed === false &&
+      ((status.plan?.counts?.accountTargets ?? 0) > 0 || (status.plan?.counts?.videoTargets ?? 0) > 0)
+  );
+}
+
+function defaultPidCheck(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function splitCycleArgs(extraArgs = []) {
+  const pluginArgs = {
+    background: false,
+    forceRefreshPlan: false
+  };
+  const batchArgs = [];
+  for (const arg of extraArgs) {
+    if (arg === backgroundCycleFlag) {
+      pluginArgs.background = true;
+      continue;
+    }
+    if (arg === forceRefreshPlanFlag) {
+      pluginArgs.forceRefreshPlan = true;
+      continue;
+    }
+    batchArgs.push(arg);
+  }
+  return { pluginArgs, batchArgs };
+}
+
+export function getManagedCycleArtifacts(runtimeCwd, dataDir) {
+  const runtimeDir = path.join(runtimeCwd, ".runtime");
+  const statePath = path.join(runtimeDir, managedCycleStateFile);
+  const logPath = path.join(runtimeDir, managedCycleLogFile);
+  return {
+    runtimeDir,
+    statePath,
+    logPath,
+    dataDir
+  };
+}
+
+export function readManagedCycleState(runtimeCwd, dataDir) {
+  const { statePath } = getManagedCycleArtifacts(runtimeCwd, dataDir);
+  if (!fs.existsSync(statePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(statePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function writeManagedCycleState(runtimeCwd, dataDir, state) {
+  const artifacts = getManagedCycleArtifacts(runtimeCwd, dataDir);
+  fs.mkdirSync(artifacts.runtimeDir, { recursive: true });
+  fs.writeFileSync(artifacts.statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  return artifacts.statePath;
+}
+
+function describeManagedCycleState(runtimeCwd, dataDir) {
+  const state = readManagedCycleState(runtimeCwd, dataDir);
+  if (!state) {
+    return null;
+  }
+  return {
+    ...state,
+    active: state.status === "running" && pidCheckImpl(state.pid)
+  };
+}
+
+export function startManagedBackgroundCycle(runtime, monitorDataDir, batchArgs = [], options = {}) {
+  const artifacts = getManagedCycleArtifacts(runtime.cwd, monitorDataDir);
+  const existingState = describeManagedCycleState(runtime.cwd, monitorDataDir);
+  if (existingState?.active) {
+    const status = readCycleStatus(runtime, monitorDataDir);
+    const baseSyncState = readManualBaseSyncState(runtime.cwd, monitorDataDir);
+    return {
+      mode: "managed-background-cycle",
+      started: false,
+      alreadyRunning: true,
+      managedCycle: existingState,
+      status,
+      scope: summarizeCollectionScope({ status, baseSyncState })
+    };
+  }
+
+  fs.mkdirSync(artifacts.runtimeDir, { recursive: true });
+  const stdoutFd = fs.openSync(artifacts.logPath, "a");
+  const workerScript = path.join(scriptDir, "tiktok-monitor-cycle-worker.mjs");
+  const child = spawnImpl(
+    process.execPath,
+    [
+      workerScript,
+      "--repo-root",
+      runtime.cwd,
+      "--data-dir",
+      monitorDataDir,
+      ...(options.forceRefreshPlan ? [forceRefreshPlanFlag] : []),
+      ...batchArgs
+    ],
+    {
+      cwd: runtime.cwd,
+      detached: true,
+      windowsHide: true,
+      stdio: ["ignore", stdoutFd, stdoutFd],
+      env: {
+        ...process.env,
+        TIKTOK_MONITOR_REPO: runtime.cwd,
+        TIKTOK_MONITOR_DATA_DIR: monitorDataDir
+      }
+    }
+  );
+  child.unref?.();
+
+  writeManagedCycleState(runtime.cwd, monitorDataDir, {
+    mode: "managed-background-cycle",
+    status: "running",
+    pid: child.pid,
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    repoRoot: runtime.cwd,
+    dataDir: monitorDataDir,
+    forceRefreshPlan: Boolean(options.forceRefreshPlan),
+    batchArgs,
+    logPath: artifacts.logPath
+  });
+
+  const status = readCycleStatus(runtime, monitorDataDir);
+  const baseSyncState = readManualBaseSyncState(runtime.cwd, monitorDataDir);
+  return {
+    mode: "managed-background-cycle",
+    started: true,
+    alreadyRunning: false,
+    managedCycle: describeManagedCycleState(runtime.cwd, monitorDataDir),
+    status,
+    scope: summarizeCollectionScope({ status, baseSyncState })
+  };
 }
 
 function countSnapshotLines(dataDir, cwd = process.cwd()) {
@@ -116,14 +316,19 @@ function countSnapshotLines(dataDir, cwd = process.cwd()) {
   return text.split(/\r?\n/u).filter(Boolean).length;
 }
 
-export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterations = 1000) {
+export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterations = 1000, options = {}) {
   const beforeSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
   const batches = [];
-  let refreshPlan = true;
+  const initialStatus = readCycleStatus(runtime, monitorDataDir);
+  let refreshPlan = options.forceRefreshPlan ? true : !shouldResumeCurrentPlan(initialStatus);
   let trackedPlanCreatedAt = null;
   let rolloverDetected = false;
   let rolloverCursor = null;
   let cycleCompleted = false;
+
+  if (!refreshPlan) {
+    trackedPlanCreatedAt = initialStatus.cursor?.planCreatedAt ?? null;
+  }
 
   for (let index = 0; index < maxIterations; index += 1) {
     const commandArgs = mapCommand("collect-batch", monitorDataDir);
@@ -151,7 +356,8 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
   }
 
   const afterSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
-  const status = execNodeScriptJson(runtime.cliPath, mapCommand("status", monitorDataDir), runtime.cwd);
+  const status = readCycleStatus(runtime, monitorDataDir);
+  const baseSyncStateBeforeSync = readManualBaseSyncState(runtime.cwd, monitorDataDir);
   if (rolloverDetected) {
     return {
       source: "cloakbrowser",
@@ -162,7 +368,12 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
       trackedPlanCreatedAt,
       rolloverDetected,
       rolloverCursor,
-      status
+      status,
+      scope: summarizeCollectionScope({
+        status,
+        baseSyncState: baseSyncStateBeforeSync,
+        batches
+      })
     };
   }
   if (!cycleCompleted) {
@@ -175,10 +386,16 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
       trackedPlanCreatedAt,
       rolloverDetected: false,
       iterationLimitReached: true,
-      status
+      status,
+      scope: summarizeCollectionScope({
+        status,
+        baseSyncState: baseSyncStateBeforeSync,
+        batches
+      })
     };
   }
   const baseSync = execNodeScriptJson(runtime.cliPath, mapCommand("sync", monitorDataDir), runtime.cwd);
+  const baseSyncStateAfterSync = readManualBaseSyncState(runtime.cwd, monitorDataDir);
 
   return {
     source: "cloakbrowser",
@@ -189,7 +406,12 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
     trackedPlanCreatedAt,
     rolloverDetected,
     baseSync,
-    status
+    status,
+    scope: summarizeCollectionScope({
+      status,
+      baseSyncState: baseSyncStateAfterSync,
+      batches
+    })
   };
 }
 
@@ -211,9 +433,16 @@ function main(argv = process.argv.slice(2)) {
   const runtime = resolveRuntime(process.env.TIKTOK_MONITOR_REPO);
   const dataDir = process.env.TIKTOK_MONITOR_DATA_DIR ?? "monitoring_data";
   if (command === "cycle") {
-    const result = runSafeCycle(runtime, dataDir, extraArgs);
+    const { pluginArgs, batchArgs } = splitCycleArgs(extraArgs);
+    const result = pluginArgs.background
+      ? startManagedBackgroundCycle(runtime, dataDir, batchArgs, {
+          forceRefreshPlan: pluginArgs.forceRefreshPlan
+        })
+      : runSafeCycle(runtime, dataDir, batchArgs, 1000, {
+          forceRefreshPlan: pluginArgs.forceRefreshPlan
+        });
     console.log(JSON.stringify(result, null, 2));
-    if (result.rolloverDetected || result.iterationLimitReached) {
+    if (!pluginArgs.background && (result.rolloverDetected || result.iterationLimitReached)) {
       process.exitCode = 1;
     }
     return;
@@ -224,6 +453,11 @@ function main(argv = process.argv.slice(2)) {
   }
   if (command === "status") {
     const result = execNodeScriptJson(runtime.cliPath, mapCommand("status", dataDir), runtime.cwd);
+    result.managedCycle = describeManagedCycleState(runtime.cwd, dataDir);
+    result.scope = summarizeCollectionScope({
+      status: result,
+      baseSyncState: readManualBaseSyncState(runtime.cwd, dataDir)
+    });
     console.log(JSON.stringify(result, null, 2));
     return;
   }

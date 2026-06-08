@@ -23,19 +23,48 @@ Run:
 node scripts/setup.mjs
 ```
 
-Checklist:
+If you install with:
 
-1. Build the bundled runtime with `node scripts/build-bundle.mjs`.
-2. Install or copy the plugin to the target machine.
-3. Ensure `CloakBrowser` is installed and its `source-profile` has logged in to TikTok.
-4. Ensure `monitoring_data/alert_config.json` exists with your Feishu DM recipient.
-5. Ensure `monitoring_data/base_dashboard_config.json` exists if Base sync is required.
+```powershell
+node scripts/install-local.mjs
+```
+
+the installer now auto-runs `setup.mjs` for you by default.
+
+What setup now does automatically:
+
+1. Creates `monitoring_data/` if it is missing.
+2. Builds the bundled runtime when the source repo is available but `dist/runtime` is missing.
+3. Creates `monitoring_data/alert_config.json` from the template if it is missing.
+4. Creates `monitoring_data/base_dashboard_whitelist_config.json` from the template if it is missing.
+5. Creates `monitoring_data/base_dashboard_config.json` from the template if it is missing.
+5. Prints a final Chinese status:
+   - `可以正式采集`
+   - `还不能正式采集，请先完成以下步骤`
+   - `初始化失败，请先修复关键问题`
+
+Manual items that setup can only guide, not finish for you:
+
+1. Install or copy the plugin to the target machine.
+2. Install `CloakBrowser`.
+3. Log in to TikTok once in the `source-profile`.
+4. Fill in the real Feishu values inside:
+   - `monitoring_data/alert_config.json`
+   - `monitoring_data/base_dashboard_whitelist_config.json`
+   - `monitoring_data/base_dashboard_config.json`
+5. The whitelist config is the required one for the formal collection + append-only sync path; the larger dashboard config is optional unless you also need dashboard/schema workflows.
 6. Keep the TikTok source profile healthy. If the site starts returning login walls or blank profile lists, refresh the headed source-profile session before assuming the collector is broken.
 
 For local installation:
 
 ```powershell
 node scripts/install-local.mjs
+```
+
+Optional:
+
+```powershell
+node scripts/install-local.mjs --skip-setup
 ```
 
 For a distributable package:
@@ -55,6 +84,7 @@ That command builds:
 
 ```powershell
 node scripts/tiktok-monitor.mjs cycle
+node scripts/tiktok-monitor.mjs cycle --background
 node scripts/tiktok-monitor.mjs status
 node scripts/tiktok-monitor.mjs sync
 node scripts/tiktok-monitor.mjs setup
@@ -75,12 +105,16 @@ If the bundle is absent and `TIKTOK_MONITOR_REPO` is not set, the plugin tries:
 ## Formal command contract
 
 - `cycle`
-  - first batch refreshes the plan
-  - subsequent batches stay on the same `planCreatedAt`
-  - stop as soon as the current plan completes
-  - then run exactly one `base-sync-manual`
+  - foreground mode:
+    - first batch refreshes the plan
+    - subsequent batches stay on the same `planCreatedAt`
+    - stop as soon as the current plan completes
+    - then run exactly one `base-sync-manual`
+  - `cycle --background`:
+    - start the same formal one-plan cycle in a plugin-managed detached local worker
+    - use this mode for Codex automations so shell timeouts do not truncate long runs
 - `status`
-  - reads the current plan and cursor only
+  - reads the current plan and cursor plus managed background cycle state
 - `sync`
   - runs the approved append-only `base-sync-manual`
 
@@ -92,4 +126,22 @@ Do not rebuild the flow with ad hoc `collect-cloakbrowser-batch` loops or `monit
 - Keep `../../.agents/plugins/marketplace.json` with the plugin so the repository carries its own local marketplace entry.
 - Build the runtime bundle before distribution.
 - Ship the built plugin folder plus the marketplace entry, or ship the generated release zip with `install.ps1`.
-- On a new machine: install CloakBrowser, copy this plugin, log in once, configure Feishu files, then run `node scripts/tiktok-monitor.mjs cycle`.
+- On a new machine: install the plugin. The installer auto-runs `setup.mjs` when Node.js is available. Complete any Chinese manual-action prompts it prints, then run `node scripts/tiktok-monitor.mjs cycle`.
+
+## Automatic checks after install
+
+This plugin now bundles a `SessionStart` lifecycle hook.
+
+- Official Codex hooks support plugin-bundled lifecycle hooks, including `SessionStart`.
+- Official docs do **not** describe a dedicated "open plugin details page" event.
+- So the practical behavior is:
+  - install -> auto-run `setup.mjs`
+  - later session startup in a relevant TikTok monitor workspace -> auto-run a safe readiness check hook
+
+The bundled hook is non-invasive:
+
+- it does **not** auto-edit config
+- it does **not** auto-run collection
+- it only warns in Chinese when the environment is still not ready
+
+Plugin hooks still require trust review in Codex before they run.
