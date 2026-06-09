@@ -443,7 +443,7 @@ function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function main(argv = process.argv.slice(2)) {
+export function main(argv = process.argv.slice(2)) {
   const command = argv[0] ?? "cycle";
   const extraArgs = argv.slice(1);
 

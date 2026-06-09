@@ -1,6 +1,7 @@
 # TikTok monitor
 
 Portable local plugin for running TikTok monitoring with the stable `CloakBrowser` browser path.
+It can be distributed as a GitHub release package and exposes a generic launcher command for non-Codex agents.
 
 ## What shows up in the plugin page
 
@@ -67,7 +68,7 @@ Optional:
 node scripts/install-local.mjs --skip-setup
 ```
 
-For a distributable package:
+For a distributable GitHub package:
 
 ```powershell
 node scripts/package-release.mjs
@@ -77,17 +78,30 @@ That command builds:
 
 - a ready-to-copy plugin folder
 - a matching marketplace file
-- an `install.ps1` one-click installer
+- `install.cmd` / `install.ps1` / `install.sh`
+- a global launcher command entry: `tiktok-monitor`
 - a zip package under `dist/plugin-releases/`
 
 ## Commands
 
+Preferred generic launcher:
+
 ```powershell
-node scripts/tiktok-monitor.mjs cycle
-node scripts/tiktok-monitor.mjs cycle --background
-node scripts/tiktok-monitor.mjs status
-node scripts/tiktok-monitor.mjs sync
-node scripts/tiktok-monitor.mjs setup
+tiktok-monitor setup
+tiktok-monitor cycle
+tiktok-monitor cycle --background
+tiktok-monitor status
+tiktok-monitor sync
+```
+
+Direct script fallback:
+
+```powershell
+node scripts/tiktok-monitor-launcher.mjs cycle
+node scripts/tiktok-monitor-launcher.mjs cycle --background
+node scripts/tiktok-monitor-launcher.mjs status
+node scripts/tiktok-monitor-launcher.mjs sync
+node scripts/tiktok-monitor-launcher.mjs setup
 ```
 
 Optional environment variables:
@@ -126,7 +140,7 @@ Do not rebuild the flow with ad hoc `collect-cloakbrowser-batch` loops or `monit
 - Keep `../../.agents/plugins/marketplace.json` with the plugin so the repository carries its own local marketplace entry.
 - Build the runtime bundle before distribution.
 - Ship the built plugin folder plus the marketplace entry, or ship the generated release zip with `install.ps1`.
-- On a new machine: install the plugin. The installer auto-runs `setup.mjs` when Node.js is available. Complete any Chinese manual-action prompts it prints, then run `node scripts/tiktok-monitor.mjs cycle`.
+- On a new machine: install the package. The installer auto-runs `setup.mjs` when Node.js is available, creates launcher shims, and prints Chinese manual-action prompts for the remaining login/config steps. Then run `tiktok-monitor cycle`.
 
 ## Automatic checks after install
 
