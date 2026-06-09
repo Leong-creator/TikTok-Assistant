@@ -347,6 +347,78 @@ test("runSafeCycle resumes an incomplete current plan without refreshing a new o
   }
 });
 
+test("runSafeCycle retries manual base sync when the child exits with a transient control event", async () => {
+  const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-sync-retry-"));
+  try {
+    await mkdir(path.join(repoRoot, "src"), { recursive: true });
+    await mkdir(path.join(repoRoot, "monitoring_data", "snapshots"), { recursive: true });
+    await mkdir(path.join(repoRoot, "monitoring_data", "state"), { recursive: true });
+    await writeFile(path.join(repoRoot, "src", "monitor-cli.mjs"), "export default null;\n");
+    await writeFile(path.join(repoRoot, "monitoring_data", "snapshots", "video_snapshots.jsonl"), "");
+    await writeFile(
+      path.join(repoRoot, "monitoring_data", "state", "manual_base_sync_state.json"),
+      `${JSON.stringify({ counts: { archive: 6000, likes: 80, increments: 20 } })}\n`
+    );
+
+    const outputs = [
+      {
+        plan: { createdAt: null, counts: { accounts: 1, accountTargets: 1, videoTargets: 10 } },
+        cursor: { accountIndex: 0, videoIndex: 0, completed: false }
+      },
+      {
+        batch: { accounts: 1, videos: 10, done: true },
+        snapshots: { video: 2, product: 0 },
+        cursor: { accountIndex: 1, videoIndex: 10, completed: true }
+      },
+      {
+        plan: { counts: { accounts: 1, accountTargets: 1, videoTargets: 10 } },
+        cursor: { accountIndex: 1, videoIndex: 10, completed: true }
+      },
+      {
+        inserted: { archive: 2, likes: 1, increments: 1 }
+      }
+    ];
+    let syncAttempts = 0;
+    const calls = [];
+    const runtime = {
+      cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
+      cwd: repoRoot
+    };
+    const fakeExecFileSync = (command, args, options) => {
+      calls.push({ command, args, cwd: options.cwd });
+      if (args[1] === "base-sync-manual" && syncAttempts++ === 0) {
+        const error = new Error("transient control event");
+        error.status = 3221225786;
+        throw error;
+      }
+      const next = outputs.shift();
+      if (!next) {
+        throw new Error("unexpected extra exec");
+      }
+      return JSON.stringify(next);
+    };
+
+    const module = await import("../plugins/tiktok-monitor/scripts/tiktok-monitor.mjs");
+    module.__setExecFileSyncForTests?.(fakeExecFileSync);
+    try {
+      const result = runSafeCycle(runtime, "monitoring_data", ["--dry-run"], 5, {
+        baseSyncRetries: 1,
+        baseSyncRetryDelayMs: 0
+      });
+      assert.equal(result.baseSync.inserted.archive, 2);
+      assert.equal(syncAttempts, 2);
+      assert.deepEqual(
+        calls.map((call) => call.args[1]),
+        ["collect-status", "collect-cloakbrowser-batch", "collect-status", "base-sync-manual", "base-sync-manual"]
+      );
+    } finally {
+      module.__setExecFileSyncForTests?.(null);
+    }
+  } finally {
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("background cycle starts one managed worker and records runner state", async () => {
   const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-background-"));
   try {
