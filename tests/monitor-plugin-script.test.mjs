@@ -47,6 +47,65 @@ test("plugin command mapping keeps formal cloakbrowser batch and manual sync ent
   ]);
 });
 
+test("plugin child node invocations always request hidden windows on Windows", async () => {
+  const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-hide-window-"));
+  try {
+    await mkdir(path.join(repoRoot, "src"), { recursive: true });
+    await mkdir(path.join(repoRoot, "monitoring_data", "snapshots"), { recursive: true });
+    await mkdir(path.join(repoRoot, "monitoring_data", "state"), { recursive: true });
+    await writeFile(path.join(repoRoot, "src", "monitor-cli.mjs"), "export default null;\n");
+    await writeFile(path.join(repoRoot, "monitoring_data", "snapshots", "video_snapshots.jsonl"), "");
+    await writeFile(
+      path.join(repoRoot, "monitoring_data", "state", "manual_base_sync_state.json"),
+      `${JSON.stringify({ counts: { archive: 1, likes: 1, increments: 1 } })}\n`
+    );
+
+    const outputs = [
+      {
+        plan: { createdAt: null, counts: { accounts: 1, accountTargets: 1, videoTargets: 1 } },
+        cursor: { accountIndex: 0, videoIndex: 0, completed: false }
+      },
+      {
+        batch: { accounts: 1, videos: 1, done: true },
+        snapshots: { video: 1, product: 0 },
+        cursor: { accountIndex: 1, videoIndex: 1, completed: true }
+      },
+      {
+        plan: { counts: { accounts: 1, accountTargets: 1, videoTargets: 1 } },
+        cursor: { accountIndex: 1, videoIndex: 1, completed: true }
+      },
+      {
+        inserted: { archive: 1, likes: 0, increments: 0 }
+      }
+    ];
+    const calls = [];
+    const runtime = {
+      cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
+      cwd: repoRoot
+    };
+    const fakeExecFileSync = (command, args, options) => {
+      calls.push({ command, args, options });
+      const next = outputs.shift();
+      if (!next) {
+        throw new Error("unexpected extra exec");
+      }
+      return JSON.stringify(next);
+    };
+
+    const module = await import("../plugins/tiktok-monitor/scripts/tiktok-monitor.mjs");
+    module.__setExecFileSyncForTests?.(fakeExecFileSync);
+    try {
+      runSafeCycle(runtime, "monitoring_data", [], 5);
+      assert.ok(calls.length >= 4);
+      assert.ok(calls.every((call) => call.options.windowsHide === true));
+    } finally {
+      module.__setExecFileSyncForTests?.(null);
+    }
+  } finally {
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("plugin runtime prefers explicit monitor repo over bundled runtime during development", async () => {
   const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-repo-"));
   try {
