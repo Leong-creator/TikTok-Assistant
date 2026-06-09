@@ -33,6 +33,7 @@ await fs.writeFile(path.join(packageDir, "install.ps1"), buildInstallerScript(),
 await fs.writeFile(path.join(packageDir, "install.cmd"), buildWindowsBootstrapScript(), "utf8");
 await fs.writeFile(path.join(packageDir, "install.sh"), buildPosixInstallerScript(), { encoding: "utf8", mode: 0o755 });
 await fs.writeFile(path.join(packageDir, "INSTALL.md"), buildInstallGuide(version), "utf8");
+await fs.writeFile(path.join(packageDir, "RELEASE_TEMPLATE.md"), buildReleaseTemplate(version), "utf8");
 await fs.writeFile(path.join(packageDir, "release.json"), `${JSON.stringify(buildReleaseManifest(version), null, 2)}\n`, "utf8");
 
 await runPowerShell([
@@ -214,7 +215,20 @@ function buildPackageMarketplace() {
 function buildInstallGuide(versionText) {
   return `# TikTok monitor ${versionText}
 
-## One-click local install
+## Treat This As A CLI
+
+Use this package as a local CLI first.
+
+- Preferred:
+  - \`tiktok-monitor setup\`
+  - \`tiktok-monitor cycle\`
+  - \`tiktok-monitor cycle --background\`
+  - \`tiktok-monitor status\`
+  - \`tiktok-monitor sync\`
+- The Codex plugin is optional.
+- External agents should call the launcher command directly instead of relying on \`plugin://\`.
+
+## One-click install
 
 1. Unzip this package.
 2. Run \`install.cmd\` or \`install.ps1\` on Windows, or \`./install.sh\` on macOS/Linux.
@@ -236,8 +250,70 @@ tiktok-monitor cycle
   - \`tiktok-monitor cycle --background\`
   - \`tiktok-monitor status\`
   - \`tiktok-monitor sync\`
+  - \`tiktok-monitor setup\`
 - Fallback:
   - \`node "$HOME/plugins/tiktok-monitor/scripts/tiktok-monitor-launcher.mjs" cycle\`
+
+## Manual items that still require user or agent action
+
+- install \`Node.js\`
+- install \`CloakBrowser\`
+- log in to TikTok once in the \`source-profile\`
+- fill real Feishu Base / alert config values
+
+If any of those are missing, the launcher will stop and print Chinese guidance instead of silently failing.
+`;
+}
+
+function buildReleaseTemplate(versionText) {
+  return `# TikTok monitor ${versionText}
+
+Use this release as a **CLI package first**.
+
+## Install
+
+- Windows:
+  - run \`install.cmd\`
+  - or run \`install.ps1\`
+- macOS / Linux:
+  - run \`./install.sh\`
+
+## Agent entry
+
+\`\`\`powershell
+tiktok-monitor setup
+tiktok-monitor cycle
+tiktok-monitor cycle --background
+tiktok-monitor status
+tiktok-monitor sync
+\`\`\`
+
+Fallback:
+
+\`\`\`powershell
+node "$HOME/plugins/tiktok-monitor/scripts/tiktok-monitor-launcher.mjs" cycle
+\`\`\`
+
+## Installer handles
+
+- plugin file install
+- bundled runtime install
+- launcher shim install
+- readiness check
+- Chinese manual guidance for missing login/config
+
+## Manual items still required
+
+- install \`Node.js\`
+- install \`CloakBrowser\`
+- log in to TikTok once in the \`source-profile\`
+- fill real Feishu Base / alert config values
+
+## Expected setup output
+
+- \`可以正式采集\`
+- \`还不能正式采集，请先完成以下步骤\`
+- \`初始化失败，请先修复关键问题\`
 `;
 }
 
