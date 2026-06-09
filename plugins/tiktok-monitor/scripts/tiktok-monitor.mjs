@@ -16,6 +16,7 @@ const forceRefreshPlanFlag = "--force-refresh-plan";
 const managedCycleStateFile = "tiktok-monitor-cycle-state.json";
 const managedCycleLogFile = "tiktok-monitor-cycle.log";
 const execJsonMaxBuffer = 16 * 1024 * 1024;
+const retryableChildExitStatuses = new Set([3221225786]);
 
 export function __setExecFileSyncForTests(fn) {
   execFileSyncImpl = fn ?? execFileSync;
@@ -394,7 +395,7 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
       })
     };
   }
-  const baseSync = execNodeScriptJson(runtime.cliPath, mapCommand("sync", monitorDataDir), runtime.cwd);
+  const baseSync = runBaseSyncWithRetry(runtime, monitorDataDir, options);
   const baseSyncStateAfterSync = readManualBaseSyncState(runtime.cwd, monitorDataDir);
 
   return {
@@ -413,6 +414,33 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
       batches
     })
   };
+}
+
+function runBaseSyncWithRetry(runtime, monitorDataDir, options = {}) {
+  const retries = Number.isInteger(options.baseSyncRetries) ? options.baseSyncRetries : 2;
+  const delayMs = Number.isFinite(options.baseSyncRetryDelayMs) ? options.baseSyncRetryDelayMs : 1500;
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return execNodeScriptJson(runtime.cliPath, mapCommand("sync", monitorDataDir), runtime.cwd);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableChildExit(error) || attempt === retries) {
+        throw error;
+      }
+      sleepSync(delayMs);
+    }
+  }
+  throw lastError;
+}
+
+function isRetryableChildExit(error) {
+  return retryableChildExitStatuses.has(Number(error?.status));
+}
+
+function sleepSync(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function main(argv = process.argv.slice(2)) {

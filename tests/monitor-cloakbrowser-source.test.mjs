@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -230,6 +231,54 @@ test("collectCloakBrowserSnapshots composes Bright Data and Dokobot fallback hoo
     assert.equal(detailResult.status, "ok");
     assert.equal(detailResult.video.views, 1);
   } finally {
+    await rm(profileRoot, { recursive: true, force: true });
+  }
+});
+
+test("collectCloakBrowserSnapshots ignores transient EPERM when removing an ephemeral run profile", async () => {
+  const profileRoot = await mkdtemp(path.join(tmpdir(), "tk-cloak-source-eperm-"));
+  const context = {
+    async close() {}
+  };
+  const originalRmSync = fs.rmSync;
+  let rmAttempts = 0;
+
+  try {
+    const sourceProfileDir = path.join(profileRoot, "source");
+    const runProfileDir = path.join(profileRoot, "run");
+    await mkdir(sourceProfileDir, { recursive: true });
+
+    fs.rmSync = ((target, options) => {
+      if (String(target).includes("-task-") && rmAttempts++ < 2) {
+        const error = new Error("locked");
+        error.code = "EPERM";
+        throw error;
+      }
+      return originalRmSync(target, options);
+    });
+
+    const result = await collectCloakBrowserSnapshots({
+      videos: [],
+      config: {
+        cloakbrowserProfileDir: runProfileDir,
+        cloakbrowserSourceProfileDir: sourceProfileDir,
+        cloakbrowserEphemeral: true,
+        launchCloakBrowserPersistentContext: async () => context,
+        createPlaywrightBrowserClient: () => ({ fake: true }),
+        collectChromeSnapshots: async () => ({
+          source: "ignored",
+          collectedAt: "2026-05-16T10:00:00.000Z",
+          videoSnapshots: [],
+          productSnapshots: [],
+          failures: []
+        })
+      }
+    });
+
+    assert.equal(result.source, "cloakbrowser");
+    assert.ok(rmAttempts >= 2);
+  } finally {
+    fs.rmSync = originalRmSync;
     await rm(profileRoot, { recursive: true, force: true });
   }
 });

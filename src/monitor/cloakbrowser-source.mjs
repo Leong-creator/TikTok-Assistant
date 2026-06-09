@@ -164,7 +164,7 @@ async function withCloakBrowserBrowserClient({ config = {}, run }) {
   const cleanupRunProfileDir = runProfileDir !== profiles.runProfileDir ? runProfileDir : null;
 
   if (config.cloakbrowserFresh ?? true) {
-    fs.rmSync(runProfileDir, { recursive: true, force: true });
+    removeDirBestEffortSync(runProfileDir);
   }
   ensureSeededProfile({
     profileDir: runProfileDir,
@@ -209,7 +209,7 @@ async function withCloakBrowserBrowserClient({ config = {}, run }) {
   } finally {
     await context?.close?.();
     if (cleanupRunProfileDir) {
-      fs.rmSync(cleanupRunProfileDir, { recursive: true, force: true });
+      removeDirBestEffortSync(cleanupRunProfileDir);
     }
   }
 }
@@ -305,4 +305,29 @@ function createEphemeralRunProfileDir(baseDir) {
   const parentDir = path.dirname(normalizedBase);
   const baseName = path.basename(normalizedBase);
   return path.join(parentDir, `${baseName}-task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+}
+
+function removeDirBestEffortSync(targetDir, { retries = 6, delayMs = 250 } = {}) {
+  if (!targetDir) return;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      fs.rmSync(targetDir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!isProfileLockError(error) || attempt === retries) {
+        return;
+      }
+      sleepSync(delayMs);
+    }
+  }
+}
+
+function isProfileLockError(error) {
+  const code = error?.code;
+  return code === "EPERM" || code === "EBUSY" || code === "EACCES";
+}
+
+function sleepSync(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
