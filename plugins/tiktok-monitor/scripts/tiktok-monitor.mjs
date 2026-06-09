@@ -107,7 +107,8 @@ export function resolveMonitorRepoRoot(explicitRoot, cwd = process.cwd()) {
 function execNodeScript(scriptPath, scriptArgs = [], cwd = process.cwd()) {
   execFileSyncImpl("node", [path.resolve(scriptPath), ...scriptArgs], {
     cwd,
-    stdio: "inherit"
+    stdio: "inherit",
+    windowsHide: true
   });
 }
 
@@ -116,7 +117,8 @@ function execNodeScriptJson(scriptPath, scriptArgs = [], cwd = process.cwd()) {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
-    maxBuffer: execJsonMaxBuffer
+    maxBuffer: execJsonMaxBuffer,
+    windowsHide: true
   });
   return JSON.parse(stdout);
 }
