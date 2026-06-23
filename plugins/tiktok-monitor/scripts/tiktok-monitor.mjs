@@ -120,7 +120,44 @@ function execNodeScriptJson(scriptPath, scriptArgs = [], cwd = process.cwd()) {
     maxBuffer: execJsonMaxBuffer,
     windowsHide: true
   });
-  return JSON.parse(stdout);
+  return parseJsonFromPossiblyNoisyStdout(stdout);
+}
+
+function parseJsonFromPossiblyNoisyStdout(stdout) {
+  const text = String(stdout ?? "").trim();
+  if (!text) {
+    throw new Error("Expected JSON output but received empty stdout.");
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    const sanitized = stripKnownNoiseLines(text);
+    const candidate = extractTrailingJsonBlock(sanitized);
+    return JSON.parse(candidate);
+  }
+}
+
+function stripKnownNoiseLines(text) {
+  return String(text ?? "")
+    .split(/\r?\n/u)
+    .filter((line) => !/^\[cloakbrowser\]/iu.test(String(line).trim()))
+    .join("\n")
+    .trim();
+}
+
+function extractTrailingJsonBlock(text) {
+  const trimmed = String(text ?? "").trim();
+  const objectStart = trimmed.lastIndexOf("\n{");
+  const arrayStart = trimmed.lastIndexOf("\n[");
+  const start = Math.max(objectStart, arrayStart);
+  if (start >= 0) {
+    return trimmed.slice(start + 1).trim();
+  }
+  const braceStart = trimmed.search(/[\[{]/u);
+  if (braceStart >= 0) {
+    return trimmed.slice(braceStart).trim();
+  }
+  return trimmed;
 }
 
 function readCycleStatus(runtime, monitorDataDir) {

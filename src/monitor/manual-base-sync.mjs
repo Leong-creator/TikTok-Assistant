@@ -68,6 +68,7 @@ export async function syncWhitelistManualBaseTables({
     likes: tableByName.get(tableNames.likes),
     increments: tableByName.get(tableNames.increments)
   };
+  const configWarnings = [];
 
   for (const [kind, tableId] of Object.entries(tableMap)) {
     if (!tableId) {
@@ -75,19 +76,29 @@ export async function syncWhitelistManualBaseTables({
     }
   }
 
-  await ensureManualResultTableFields({
-    baseToken: resolvedBaseToken,
-    tableMap,
-    larkCliPath,
-    execFileImpl,
-    platform
+  await runOptionalBaseConfigStep({
+    label: "ensureManualResultTableFields",
+    warnings: configWarnings,
+    task: () =>
+      ensureManualResultTableFields({
+        baseToken: resolvedBaseToken,
+        tableMap,
+        larkCliPath,
+        execFileImpl,
+        platform
+      })
   });
-  await ensureManualResultViews({
-    baseToken: resolvedBaseToken,
-    tableMap,
-    larkCliPath,
-    execFileImpl,
-    platform
+  await runOptionalBaseConfigStep({
+    label: "ensureManualResultViews",
+    warnings: configWarnings,
+    task: () =>
+      ensureManualResultViews({
+        baseToken: resolvedBaseToken,
+        tableMap,
+        larkCliPath,
+        execFileImpl,
+        platform
+      })
   });
 
   const cleared = {
@@ -151,6 +162,7 @@ export async function syncWhitelistManualBaseTables({
   return {
     baseToken: resolvedBaseToken,
     tableMap,
+    configWarnings,
     cleared,
     inserted,
     counts: {
@@ -161,6 +173,29 @@ export async function syncWhitelistManualBaseTables({
       skippedLikes: skippedLikes.length
     }
   };
+}
+
+async function runOptionalBaseConfigStep({ label, warnings, task }) {
+  try {
+    await task();
+  } catch (error) {
+    if (!isSkippableBaseConfigError(error)) {
+      throw error;
+    }
+    warnings.push({
+      step: label,
+      message: extractBaseConfigErrorMessage(error)
+    });
+  }
+}
+
+function isSkippableBaseConfigError(error) {
+  const message = extractBaseConfigErrorMessage(error);
+  return /you don't have permission|91403|token_missing|need_user_authorization/i.test(message);
+}
+
+function extractBaseConfigErrorMessage(error) {
+  return String(error?.stderr ?? error?.stdout ?? error?.message ?? error ?? "");
 }
 
 export function buildWhitelistManualTableRows({ dashboardRecords, skippedLikes = [], suppressIncrements = false, accountProductLookup = new Map() } = {}) {
