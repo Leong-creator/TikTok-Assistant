@@ -10,7 +10,6 @@ import { isCanonicalTikTokVideoUrl } from "./video-time.mjs";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_WHITELIST_CONFIG_PATH = path.join("monitoring_data", "base_dashboard_whitelist_config.json");
-const MANUAL_SYNC_STATE_PATH = path.join("monitoring_data", "state", "manual_base_sync_state.json");
 const LIKE_SOURCE_FIELD = "来源品表";
 const INCREMENT_PRODUCT_FIELD = "商品";
 const LEGACY_INCREMENT_PRODUCT_FIELD = "产品名";
@@ -24,6 +23,7 @@ const INCREMENT_VIEWS_PER_HOUR_FIELD = "每小时播放增量";
 const INCREMENT_SUMMARY_FIELD = "起量数据";
 const LEGACY_INCREMENT_SUMMARY_FIELD = "增量说明";
 const MIN_INCREMENT_VIEWS_DELTA = 1000;
+const DEFAULT_LARK_CLI_TIMEOUT_MS = 90_000;
 const DEFAULT_TABLE_NAMES = {
   archive: "汇总视频（数据存档）",
   likes: "视频榜（点赞>2k）",
@@ -39,6 +39,7 @@ export async function syncWhitelistManualBaseTables({
   execFileImpl = execFileAsync,
   platform = process.platform
 } = {}) {
+  const manualSyncStatePath = resolveManualSyncStatePath(dataDir);
   const resolvedBaseToken = baseToken ?? (await readJsonFile(DEFAULT_WHITELIST_CONFIG_PATH, {})).baseToken;
   if (!resolvedBaseToken) {
     throw new Error("baseToken is required");
@@ -53,7 +54,7 @@ export async function syncWhitelistManualBaseTables({
     dataDir,
     whitelistAccounts: resolvedWhitelistAccounts
   });
-  const manualSyncState = await readJsonFile(MANUAL_SYNC_STATE_PATH, null);
+  const manualSyncState = await readJsonFile(manualSyncStatePath, null);
   const accountProductLookup = buildAccountProductLookup(resolvedWhitelistAccounts);
   const manualRows = buildWhitelistManualTableRows({
     dashboardRecords,
@@ -148,7 +149,7 @@ export async function syncWhitelistManualBaseTables({
     platform
   });
 
-  await writeJsonFile(MANUAL_SYNC_STATE_PATH, {
+  await writeJsonFile(manualSyncStatePath, {
     baseToken: resolvedBaseToken,
     hasBaseline: true,
     syncedAt: new Date().toISOString(),
@@ -173,6 +174,10 @@ export async function syncWhitelistManualBaseTables({
       skippedLikes: skippedLikes.length
     }
   };
+}
+
+function resolveManualSyncStatePath(dataDir = "monitoring_data") {
+  return path.join(dataDir, "state", "manual_base_sync_state.json");
 }
 
 async function runOptionalBaseConfigStep({ label, warnings, task }) {
@@ -848,19 +853,24 @@ async function syncIncrementRows({ baseToken, tableId, rows, videoSourceLookup =
     videoSourceLookup,
     accountSourceLookup
   });
+  const recreatedRows = updateRows.map(({ row }) => row);
   await deleteBaseRecords({
     baseToken,
     tableId,
-    recordIds: deleteRecordIds,
+    recordIds: [...deleteRecordIds, ...updateRows.map(({ recordId }) => recordId)],
     larkCliPath,
     execFileImpl,
     platform
   });
-  for (const { recordId, row } of updateRows) {
-    const args = ["base", "+record-upsert", "--base-token", baseToken, "--table-id", tableId, "--record-id", recordId, "--json", JSON.stringify(row)];
-    await execLarkCliWithRetry({ larkCliPath, execFileImpl, platform, args });
-  }
-  return upsertRows({
+  await createRowsBatch({
+    baseToken,
+    tableId,
+    rows: recreatedRows,
+    larkCliPath,
+    execFileImpl,
+    platform
+  });
+  await upsertRows({
     baseToken,
     tableId,
     rows: rowsToInsert,
@@ -868,19 +878,69 @@ async function syncIncrementRows({ baseToken, tableId, rows, videoSourceLookup =
     execFileImpl,
     platform
   });
+  return rowsToInsert.length;
 }
 
 async function upsertRows({ baseToken, tableId, rows, larkCliPath, execFileImpl, platform }) {
+  return createRowsBatch({
+    baseToken,
+    tableId,
+    rows,
+    larkCliPath,
+    execFileImpl,
+    platform
+  });
+}
+
+async function createRowsBatch({ baseToken, tableId, rows = [], larkCliPath, execFileImpl, platform, chunkSize = 200 }) {
+  const normalizedRows = rows
+    .filter((row) => row && typeof row === "object")
+    .map((row) =>
+      Object.fromEntries(
+        Object.entries(row).filter(([fieldName]) => String(fieldName ?? "").trim() !== "__recordId")
+      )
+    )
+    .filter((row) => Object.keys(row).length > 0);
   let inserted = 0;
-  for (let index = 0; index < rows.length; index += 1) {
-    const args = ["base", "+record-upsert", "--base-token", baseToken, "--table-id", tableId, "--json", JSON.stringify(rows[index])];
+  for (let index = 0; index < normalizedRows.length; index += chunkSize) {
+    const chunk = normalizedRows.slice(index, index + chunkSize);
+    const fields = collectBatchCreateFields(chunk);
+    const payload = {
+      fields,
+      rows: chunk.map((row) => fields.map((fieldName) => normalizeBatchCreateCellValue(row[fieldName])))
+    };
+    const args = [
+      "base", "+record-batch-create",
+      "--base-token", baseToken,
+      "--table-id", tableId,
+      "--json", JSON.stringify(payload)
+    ];
     await execLarkCliWithRetry({ larkCliPath, execFileImpl, platform, args });
-    inserted += 1;
-    if ((index + 1) % 50 === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 750));
+    inserted += chunk.length;
+    if (index + chunkSize < normalizedRows.length) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
   return inserted;
+}
+
+function collectBatchCreateFields(rows = []) {
+  const fields = [];
+  const seen = new Set();
+  for (const row of rows) {
+    for (const fieldName of Object.keys(row ?? {})) {
+      const normalizedFieldName = String(fieldName ?? "").trim();
+      if (!normalizedFieldName || seen.has(normalizedFieldName)) continue;
+      seen.add(normalizedFieldName);
+      fields.push(normalizedFieldName);
+    }
+  }
+  return fields;
+}
+
+function normalizeBatchCreateCellValue(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return value;
 }
 
 async function listTableRows({ baseToken, tableId, larkCliPath, execFileImpl, platform }) {
@@ -1392,16 +1452,19 @@ async function dedupeLikesRows({ baseToken, tableId, rows, larkCliPath, execFile
   await deleteBaseRecords({
     baseToken,
     tableId,
-    recordIds: deleteRecordIds,
+    recordIds: [...deleteRecordIds, ...updateRows.map(({ recordId }) => recordId)],
     larkCliPath,
     execFileImpl,
     platform
   });
-
-  for (const { recordId, row } of updateRows) {
-    const args = ["base", "+record-upsert", "--base-token", baseToken, "--table-id", tableId, "--record-id", recordId, "--json", JSON.stringify(row)];
-    await execLarkCliWithRetry({ larkCliPath, execFileImpl, platform, args });
-  }
+  await createRowsBatch({
+    baseToken,
+    tableId,
+    rows: updateRows.map(({ row }) => row),
+    larkCliPath,
+    execFileImpl,
+    platform
+  });
 
   return {
     deleted: deleteRecordIds.length,
@@ -1415,22 +1478,25 @@ async function syncArchiveRows({ baseToken, tableId, rows, larkCliPath, execFile
     existingRows,
     incomingRows: rows
   });
+  const recreatedRows = updateRows.map(({ row }) => row);
 
   await deleteBaseRecords({
     baseToken,
     tableId,
-    recordIds: deleteRecordIds,
+    recordIds: [...deleteRecordIds, ...updateRows.map(({ recordId }) => recordId)],
     larkCliPath,
     execFileImpl,
     platform
   });
-
-  for (const { recordId, row } of updateRows) {
-    const args = ["base", "+record-upsert", "--base-token", baseToken, "--table-id", tableId, "--record-id", recordId, "--json", JSON.stringify(row)];
-    await execLarkCliWithRetry({ larkCliPath, execFileImpl, platform, args });
-  }
-
-  return upsertRows({
+  await createRowsBatch({
+    baseToken,
+    tableId,
+    rows: recreatedRows,
+    larkCliPath,
+    execFileImpl,
+    platform
+  });
+  await upsertRows({
     baseToken,
     tableId,
     rows: rowsToInsert,
@@ -1438,6 +1504,7 @@ async function syncArchiveRows({ baseToken, tableId, rows, larkCliPath, execFile
     execFileImpl,
     platform
   });
+  return rowsToInsert.length;
 }
 
 async function buildSkippedLikeRows({ dataDir = "monitoring_data", whitelistAccounts = [] } = {}) {
@@ -1499,12 +1566,23 @@ async function execLarkCliWithRetry({ larkCliPath, execFileImpl, platform, args,
       return await execFileImpl(invocation.command, invocation.args, {
         encoding: "utf8",
         windowsHide: true,
-        maxBuffer: 20 * 1024 * 1024
+        maxBuffer: 20 * 1024 * 1024,
+        timeout: DEFAULT_LARK_CLI_TIMEOUT_MS
       });
     } catch (error) {
       lastError = error;
       const message = String(error?.stderr ?? error?.message ?? error ?? "");
-      if (!/EOF|timed out|time out|timeout|ECONNRESET|socket hang up|Temporary failure/i.test(message) || attempt === retries - 1) {
+      const timedOut =
+        Boolean(error?.killed) ||
+        String(error?.signal ?? "").trim().toUpperCase() === "SIGTERM" ||
+        /timed out|time out|timeout|ETIMEDOUT/i.test(message);
+      if (
+        !(
+          timedOut ||
+          /EOF|ECONNRESET|socket hang up|Temporary failure/i.test(message)
+        ) ||
+        attempt === retries - 1
+      ) {
         throw error;
       }
       await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));

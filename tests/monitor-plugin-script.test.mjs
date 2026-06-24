@@ -288,6 +288,78 @@ test("runSafeCycle tolerates known cloakbrowser stdout noise before JSON payload
   }
 });
 
+test("runSafeCycle applies batch timeout and emits progress callbacks around collect batches", async () => {
+  const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-progress-"));
+  try {
+    await mkdir(path.join(repoRoot, "src"), { recursive: true });
+    await mkdir(path.join(repoRoot, "monitoring_data", "snapshots"), { recursive: true });
+    await mkdir(path.join(repoRoot, "monitoring_data", "state"), { recursive: true });
+    await writeFile(path.join(repoRoot, "src", "monitor-cli.mjs"), "export default null;\n");
+    await writeFile(path.join(repoRoot, "monitoring_data", "snapshots", "video_snapshots.jsonl"), "");
+    await writeFile(
+      path.join(repoRoot, "monitoring_data", "state", "manual_base_sync_state.json"),
+      `${JSON.stringify({ counts: { archive: 5000, likes: 70, increments: 49 } })}\n`
+    );
+
+    const outputs = [
+      {
+        plan: { createdAt: "plan-a", counts: { accounts: 1, accountTargets: 1, videoTargets: 10 } },
+        cursor: { planCreatedAt: "plan-a", accountIndex: 0, videoIndex: 0, completed: false }
+      },
+      {
+        batch: { accounts: 1, videos: 10, done: true },
+        snapshots: { video: 3, product: 0 },
+        cursor: { planCreatedAt: "plan-a", accountIndex: 1, videoIndex: 10, completed: true }
+      },
+      {
+        plan: { counts: { accounts: 1, accountTargets: 1, videoTargets: 10 } },
+        cursor: { planCreatedAt: "plan-a", accountIndex: 1, videoIndex: 10, completed: true }
+      },
+      {
+        inserted: { archive: 0, likes: 0, increments: 1 }
+      }
+    ];
+    const calls = [];
+    const progressEvents = [];
+    const runtime = {
+      cliPath: path.join(repoRoot, "src", "monitor-cli.mjs"),
+      cwd: repoRoot
+    };
+    const fakeExecFileSync = (command, args, options) => {
+      calls.push({ command, args, options });
+      const next = outputs.shift();
+      if (!next) {
+        throw new Error("unexpected extra exec");
+      }
+      return JSON.stringify(next);
+    };
+
+    const module = await import("../plugins/tiktok-monitor/scripts/tiktok-monitor.mjs");
+    module.__setExecFileSyncForTests?.(fakeExecFileSync);
+    try {
+      const result = runSafeCycle(runtime, "monitoring_data", [], 5, {
+        batchTimeoutMs: 12345,
+        onProgress(progress) {
+          progressEvents.push(progress);
+        }
+      });
+      assert.equal(result.baseSync.inserted.increments, 1);
+      assert.equal(
+        calls.find((call) => call.args[1] === "collect-cloakbrowser-batch")?.options?.timeout,
+        12345
+      );
+      assert.deepEqual(
+        progressEvents.map((event) => event.phase),
+        ["initialized", "batch-start", "batch-complete", "post-collect-status", "before-sync"]
+      );
+    } finally {
+      module.__setExecFileSyncForTests?.(null);
+    }
+  } finally {
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("runSafeCycle stops before sync when a batch rolls into a different plan", async () => {
   const repoRoot = await mkdtemp(path.join(tmpdir(), "tk-monitor-plugin-rollover-"));
   try {

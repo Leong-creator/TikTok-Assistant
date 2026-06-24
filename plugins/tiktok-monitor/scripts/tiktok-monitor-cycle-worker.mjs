@@ -39,22 +39,30 @@ function main() {
   const runtime = resolveRuntime(options.repoRoot);
   const artifacts = getManagedCycleArtifacts(runtime.cwd, options.dataDir);
   const startedAt = new Date().toISOString();
-  writeManagedCycleState(runtime.cwd, options.dataDir, {
+  const writeRunningState = (progress = {}) => writeManagedCycleState(runtime.cwd, options.dataDir, {
     mode: "managed-background-cycle",
     status: "running",
     pid: process.pid,
     startedAt,
-    updatedAt: startedAt,
-      repoRoot: runtime.cwd,
-      dataDir: options.dataDir,
-      forceRefreshPlan: options.forceRefreshPlan,
-      batchArgs: options.batchArgs,
-      logPath: artifacts.logPath
-    });
+    updatedAt: new Date().toISOString(),
+    repoRoot: runtime.cwd,
+    dataDir: options.dataDir,
+    forceRefreshPlan: options.forceRefreshPlan,
+    batchArgs: options.batchArgs,
+    logPath: artifacts.logPath,
+    progress
+  });
+  writeRunningState({
+    phase: "started",
+    batchCount: 0
+  });
 
   try {
     const result = runSafeCycle(runtime, options.dataDir, options.batchArgs, 1000, {
-      forceRefreshPlan: options.forceRefreshPlan
+      forceRefreshPlan: options.forceRefreshPlan,
+      onProgress(progress) {
+        writeRunningState(progress);
+      }
     });
     const finishedAt = new Date().toISOString();
     const failed = Boolean(result.rolloverDetected || result.iterationLimitReached);
