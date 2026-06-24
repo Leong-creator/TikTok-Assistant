@@ -17,6 +17,7 @@ const managedCycleStateFile = "tiktok-monitor-cycle-state.json";
 const managedCycleLogFile = "tiktok-monitor-cycle.log";
 const execJsonMaxBuffer = 16 * 1024 * 1024;
 const retryableChildExitStatuses = new Set([3221225786]);
+const defaultBatchTimeoutMs = 12 * 60 * 1000;
 
 export function __setExecFileSyncForTests(fn) {
   execFileSyncImpl = fn ?? execFileSync;
@@ -112,12 +113,13 @@ function execNodeScript(scriptPath, scriptArgs = [], cwd = process.cwd()) {
   });
 }
 
-function execNodeScriptJson(scriptPath, scriptArgs = [], cwd = process.cwd()) {
+function execNodeScriptJson(scriptPath, scriptArgs = [], cwd = process.cwd(), options = {}) {
   const stdout = execFileSyncImpl("node", [path.resolve(scriptPath), ...scriptArgs], {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
     maxBuffer: execJsonMaxBuffer,
+    timeout: Number.isFinite(options.timeoutMs) ? Number(options.timeoutMs) : undefined,
     windowsHide: true
   });
   return parseJsonFromPossiblyNoisyStdout(stdout);
@@ -269,9 +271,11 @@ function describeManagedCycleState(runtimeCwd, dataDir) {
   if (!state) {
     return null;
   }
+  const active = state.status === "running" && pidCheckImpl(state.pid);
   return {
     ...state,
-    active: state.status === "running" && pidCheckImpl(state.pid)
+    status: state.status === "running" && !active ? "interrupted" : state.status,
+    active
   };
 }
 
@@ -360,6 +364,7 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
   const beforeSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
   const batches = [];
   const initialStatus = readCycleStatus(runtime, monitorDataDir);
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
   let refreshPlan = options.forceRefreshPlan ? true : !shouldResumeCurrentPlan(initialStatus);
   let trackedPlanCreatedAt = null;
   let rolloverDetected = false;
@@ -370,12 +375,31 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
     trackedPlanCreatedAt = initialStatus.cursor?.planCreatedAt ?? null;
   }
 
+  onProgress?.({
+    phase: "initialized",
+    status: initialStatus,
+    trackedPlanCreatedAt,
+    refreshPlan,
+    batchCount: 0
+  });
+
   for (let index = 0; index < maxIterations; index += 1) {
     const commandArgs = mapCommand("collect-batch", monitorDataDir);
     if (refreshPlan) {
       commandArgs.push("--refresh-plan");
     }
-    const batchResult = execNodeScriptJson(runtime.cliPath, [...commandArgs, ...extraArgs], runtime.cwd);
+    onProgress?.({
+      phase: "batch-start",
+      iteration: index + 1,
+      trackedPlanCreatedAt,
+      refreshPlan,
+      batchCount: batches.length
+    });
+    const batchResult = execNodeScriptJson(runtime.cliPath, [...commandArgs, ...extraArgs], runtime.cwd, {
+      timeoutMs: Number.isFinite(options.batchTimeoutMs)
+        ? Number(options.batchTimeoutMs)
+        : defaultBatchTimeoutMs
+    });
     if (!trackedPlanCreatedAt) {
       trackedPlanCreatedAt = batchResult.cursor?.planCreatedAt ?? null;
     } else if (
@@ -388,6 +412,13 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
       break;
     }
     batches.push(batchResult);
+    onProgress?.({
+      phase: "batch-complete",
+      iteration: index + 1,
+      trackedPlanCreatedAt,
+      batchCount: batches.length,
+      latestBatch: batchResult
+    });
     refreshPlan = false;
     if (batchResult.cursor?.completed || batchResult.batch?.done) {
       cycleCompleted = true;
@@ -398,6 +429,12 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
   const afterSnapshots = countSnapshotLines(monitorDataDir, runtime.cwd);
   const status = readCycleStatus(runtime, monitorDataDir);
   const baseSyncStateBeforeSync = readManualBaseSyncState(runtime.cwd, monitorDataDir);
+  onProgress?.({
+    phase: "post-collect-status",
+    status,
+    trackedPlanCreatedAt,
+    batchCount: batches.length
+  });
   if (rolloverDetected) {
     return {
       source: "cloakbrowser",
@@ -434,6 +471,12 @@ export function runSafeCycle(runtime, monitorDataDir, extraArgs = [], maxIterati
       })
     };
   }
+  onProgress?.({
+    phase: "before-sync",
+    status,
+    trackedPlanCreatedAt,
+    batchCount: batches.length
+  });
   const baseSync = runBaseSyncWithRetry(runtime, monitorDataDir, options);
   const baseSyncStateAfterSync = readManualBaseSyncState(runtime.cwd, monitorDataDir);
 
