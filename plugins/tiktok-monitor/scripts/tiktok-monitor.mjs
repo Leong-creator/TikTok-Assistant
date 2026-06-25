@@ -43,6 +43,8 @@ export function mapCommand(name, monitorDataDir) {
       "20",
       "--max-accounts",
       "1",
+      "--enable-discovery-refresh",
+      "false",
       "--cloakbrowser-humanize",
       "true",
       "--cloakbrowser-human-preset",

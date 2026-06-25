@@ -56,6 +56,7 @@ async function runCommand(command, args, defaults) {
     maxSeedVideos: numberArg(args["max-seed-videos"], undefined),
     maxBatchIterations: numberArg(args["max-batch-iterations"], undefined),
     disablePlanRollover: booleanArg(args["disable-plan-rollover"], false),
+    enableDiscoveryRefresh: booleanArg(args["enable-discovery-refresh"], defaults.enableDiscoveryRefresh),
     profileViewDeltaThreshold: numberArg(args["profile-view-delta-threshold"], defaults.profileViewDeltaThreshold),
     recycleLoginRequiredThreshold: numberArg(args["recycle-login-required-threshold"], defaults.recycleLoginRequiredThreshold),
     recycleNavigationFailureThreshold: numberArg(args["recycle-navigation-failure-threshold"], defaults.recycleNavigationFailureThreshold),

@@ -15,6 +15,7 @@ export function resolveMonitorConfig(env = process.env) {
     collectionIntervalHours: Number(env.TIKTOK_MONITOR_COLLECTION_INTERVAL_HOURS ?? 3),
     maxVideosPerAccount: Number(env.TIKTOK_CHROME_MAX_VIDEOS_PER_ACCOUNT ?? 120),
     maxProductsPerShop: Number(env.TIKTOK_CHROME_MAX_PRODUCTS_PER_SHOP ?? 6),
+    enableDiscoveryRefresh: parseBoolean(env.TIKTOK_ENABLE_DISCOVERY_REFRESH, true),
     persistentBrowserRoot,
     playwrightProfileDir:
       env.TIKTOK_PLAYWRIGHT_RUN_PROFILE_DIR ??
